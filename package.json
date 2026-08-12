@@ -1,0 +1,17 @@
+{
+  "name": "academistream",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "api:dev": "npm run start:dev -w @academistream/api",
+    "worker:dev": "npm run start:dev -w @academistream/worker",
+    "web:dev": "npm run dev -w @academistream/web",
+    "api:build": "npm run build -w @academistream/api",
+    "worker:build": "npm run build -w @academistream/worker",
+    "web:build": "npm run build -w @academistream/web",
+    "test": "npm run test -w @academistream/api -w @academistream/worker"
+  }
+}
