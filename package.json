@@ -12,6 +12,8 @@
     "api:build": "npm run build -w @academistream/api",
     "worker:build": "npm run build -w @academistream/worker",
     "web:build": "npm run build -w @academistream/web",
-    "test": "npm run test -w @academistream/api -w @academistream/worker"
+    "test": "npm run test -w @academistream/api -w @academistream/worker",
+    "db:generate": "npm run db:generate -w @academistream/api",
+    "db:migrate": "npm run db:migrate -w @academistream/api"
   }
 }

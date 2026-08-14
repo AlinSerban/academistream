@@ -17,12 +17,25 @@ B2B private training-video platform. Customer companies get their own org, users
 - Node.js 20+
 - Docker Desktop (for Postgres, Redis, Kafka)
 
+**Port note:** Compose Postgres uses host `5432`. If a Windows PostgreSQL service is also bound to `5432`, stop it (or set startup to Manual) so `DATABASE_URL` hits Docker, not the local install.
+
 ## Local setup
 
 ```bash
 cp .env.example .env
 docker compose up -d
 npm install
+```
+
+DB migrations (API / Drizzle):
+
+```bash
+npm run db:generate -w @academistream/api
+npm run db:migrate -w @academistream/api
+```
+
+```location
+ORM/migrations: Drizzle in apps/api
 ```
 
 Run apps (separate terminals):
