@@ -20,7 +20,7 @@ export const tenants = pgTable('tenants', {
 export const users = pgTable('users', {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     email: varchar({ length: 255 }).notNull().unique(),
-    password_hash: varchar({ length: 255 }).notNull(),
+    passwordHash: varchar('password_hash', { length: 255 }).notNull(),
     name: varchar({ length: 255 }).notNull(),
     isPlatformAdmin: boolean('is_platform_admin').notNull().default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),

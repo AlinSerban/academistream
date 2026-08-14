@@ -32,11 +32,20 @@ DB migrations (API / Drizzle):
 ```bash
 npm run db:generate -w @academistream/api
 npm run db:migrate -w @academistream/api
+npm run db:seed
 ```
 
 ORM/migrations: Drizzle in `apps/api`.
 
 Tenancy: users belong to tenants via `tenant_memberships` (unique user + tenant). Platform admins use `users.is_platform_admin` and may have no membership row.
+
+Seed is idempotent (re-run skips existing emails/tenants). Dev accounts (password from `SEED_PASSWORD` in `.env`, default `Password123!`):
+
+- Platform admin: `platform@academistream.local` (no tenant membership)
+- Acme: `admin@acme.local`, `instructor@acme.local`, `learner@acme.local`
+- Globex: `admin@globex.local`, `instructor@globex.local`, `learner@globex.local`
+
+To reset local data: drop the Postgres volume, then `docker compose up -d`, migrate, and seed again. Do not use these passwords in production.
 
 Run apps (separate terminals):
 

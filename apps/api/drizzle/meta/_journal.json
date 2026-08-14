@@ -15,6 +15,13 @@
       "when": 1786718571492,
       "tag": "0001_complex_katie_power",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786719800000,
+      "tag": "0002_rename_password_hash",
+      "breakpoints": true
     }
   ]
 }
