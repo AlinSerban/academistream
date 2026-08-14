@@ -34,9 +34,9 @@ npm run db:generate -w @academistream/api
 npm run db:migrate -w @academistream/api
 ```
 
-```location
-ORM/migrations: Drizzle in apps/api
-```
+ORM/migrations: Drizzle in `apps/api`.
+
+Tenancy: users belong to tenants via `tenant_memberships` (unique user + tenant). Platform admins use `users.is_platform_admin` and may have no membership row.
 
 Run apps (separate terminals):
 

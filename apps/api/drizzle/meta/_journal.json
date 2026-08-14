@@ -8,6 +8,13 @@
       "when": 1786638946169,
       "tag": "0000_reflective_moon_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786718571492,
+      "tag": "0001_complex_katie_power",
+      "breakpoints": true
     }
   ]
 }
