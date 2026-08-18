@@ -4,6 +4,8 @@ import { AppService } from './app.service';
 import { HealthController } from './health.controller';
 import { DbModule } from './db/db.module';
 import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -11,7 +13,9 @@ import { ConfigModule } from '@nestjs/config';
       isGlobal: true,
       envFilePath: ['.env', '../../.env']
     }),
-    DbModule],
+    DbModule,
+    AuthModule,
+    UsersModule],
   controllers: [AppController, HealthController],
   providers: [AppService],
 })

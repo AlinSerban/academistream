@@ -61,3 +61,6 @@ npm run web:dev
 ## Environments
 
 Config targets: `local`, `uat`, `prod` (see `.env.example`). Prototype hosting: EC2 + Docker for app + Postgres/Kafka/Redis. Scale path: see `docs/engineering/SCALE_PATH.md`.
+
+The refresh_token cookie is HttpOnly and SameSite=Strict.
+Secure is on only when NODE_ENV=production, so local HTTP (localhost) still receives the cookie. In production, serve the API over HTTPS so the cookie is only sent on TLS.
