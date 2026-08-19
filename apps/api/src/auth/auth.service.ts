@@ -22,7 +22,15 @@ export class AuthService {
             throw new UnauthorizedException();
         }
 
-        const payload = { sub: user?.id, username: user?.name };
+        const memberships = await this.usersService.findMembershipsByUserId(user.id);
+
+        const payload = {
+            sub: user?.id,
+            username: user?.name,
+            isPlatformAdmin: user.isPlatformAdmin,
+            roles: memberships
+        };
+
         const refresh_token = await this.jwtService.signAsync(payload, {
             expiresIn: 60 * 60 * 24 * 7
         })
@@ -71,6 +79,18 @@ export class AuthService {
         });
 
         return { message: 'Log out successful!' }
+    }
+
+    async getMe(userId: number) {
+        const user = await this.usersService.findUserById(userId);
+        const memberships = await this.usersService.findMembershipsByUserId(userId);
+        return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            isPlatformAdmin: user.isPlatformAdmin,
+            memberships: memberships
+        };
     }
 
 }
