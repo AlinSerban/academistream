@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable } from "@nestjs/common";
+import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { DRIZZLE } from "../db/db.module";
 import type { Db } from '../db/client';
 import type { CreateTenantInput } from "./types";
@@ -22,6 +22,23 @@ export class TenantsService {
 
         return { tenant, admin: { id: user.id, email: user.email } };
 
+    }
+
+    async getMe(tenantId: number) {
+        const [tenant] = await this.getTenantById(tenantId);
+
+        if (!tenant) throw new NotFoundException();
+
+        return {
+            id: tenant.id,
+            name: tenant.name,
+            status: tenant.status
+        }
+
+    }
+
+    private async getTenantById(tenantId: number) {
+        return await this.db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
     }
 
     private async assertTenantNameAvailable(name: string) {

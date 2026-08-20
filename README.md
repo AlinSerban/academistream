@@ -37,7 +37,13 @@ npm run db:seed
 
 ORM/migrations: Drizzle in `apps/api`.
 
-Tenancy: users belong to tenants via `tenant_memberships` (unique user + tenant). Platform admins use `users.is_platform_admin` and may have no membership row.
+### Tenancy & isolation
+
+Users belong to tenants via `tenant_memberships` (unique user + tenant). Platform admins use `users.is_platform_admin` and may have no membership row.
+
+**Isolation convention:** tenant-scoped API queries use `tenantId` from the authenticated principal (JWT memberships on `request.user`), not a client-supplied tenant id alone. Cross-tenant access returns **403** (no membership) or **404** (resource not found for that tenant). Platform admins are **global** — not tenant-scoped; they provision tenants and are not expected to call tenant-member routes like `GET /tenants/me` (that returns 403 when there is no membership).
+
+Sample check: `GET /tenants/me` returns `{ id, name, status }` for the caller's first membership tenant.
 
 Seed is idempotent (re-run skips existing emails/tenants). Dev accounts (password from `SEED_PASSWORD` in `.env`, default `Password123!`):
 
