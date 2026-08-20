@@ -45,6 +45,19 @@ Users belong to tenants via `tenant_memberships` (unique user + tenant). Platfor
 
 Sample check: `GET /tenants/me` returns `{ id, name, status }` for the caller's first membership tenant.
 
+### Testing strategy (API)
+
+Sprint 1 security tests are **unit tests with Jest mocks** — no real Postgres, Redis, or Kafka in CI.
+
+| Area | Approach |
+|------|----------|
+| Auth controller | Mock `AuthService` (`useValue`) |
+| Auth service | Real `AuthService`; mock `UsersService`, `JwtService`, and `bcrypt.compare` |
+| RolesGuard | Instantiate guard with mocked `Reflector`; fake `ExecutionContext` + JWT payload |
+| Tenant isolation | Controller uses JWT `roles[].tenantId` (Acme ≠ Globex); service `getMe(tenantId)` with mocked Drizzle |
+
+Run: `npm test -w @academistream/api` (also in CI). A transactional test DB / Supertest e2e layer is out of scope for S1-08; add later if integration coverage is needed.
+
 Seed is idempotent (re-run skips existing emails/tenants). Dev accounts (password from `SEED_PASSWORD` in `.env`, default `Password123!`):
 
 - Platform admin: `platform@academistream.local` (no tenant membership)
