@@ -77,6 +77,8 @@ npm run web:dev
 - API health: http://localhost:3000/health  
 - Web: http://localhost:5173  
 
+Web login (S1-09): Vite proxies `/api` → API (`localhost:3000`). Access token stays in Redux memory; refresh uses the HttpOnly cookie (`credentials: 'include'`). Seed users: see Tenancy section above.
+
 ## Environments
 
 Config targets: `local`, `uat`, `prod` (see `.env.example`). Prototype hosting: EC2 + Docker for app + Postgres/Kafka/Redis. Scale path: see `docs/engineering/SCALE_PATH.md`.
