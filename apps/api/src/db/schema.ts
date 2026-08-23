@@ -2,6 +2,8 @@ import { integer, varchar, timestamp, boolean, pgTable, pgEnum, unique, index } 
 
 export const tenantStatusEnum = pgEnum('tenant_status', ['active', 'suspended']);
 export const membershipRoles = pgEnum('membership_role', ['tenant_admin', 'instructor', 'learner']);
+export const publishStateEnum = pgEnum('publish_state', ['draft', 'published']);
+export const mediaStatusEnum = pgEnum('media_status', ['queued', 'processing', 'ready', 'failed']);
 
 export const healthChecks = pgTable('health_checks', {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -40,3 +42,29 @@ export const tenantMemberships = pgTable('tenant_memberships', {
         index('tenant_memberships_tenant_id_idx').on(t.tenantId)
     ]
 );
+
+export const courses = pgTable('courses', {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    tenantId: integer('tenant_id')
+        .notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    title: varchar({ length: 255 }).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull()
+}, (t) => [
+    index('courses_tenant_id_idx').on(t.tenantId)
+])
+
+export const videos = pgTable('videos', {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    tenantId: integer('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    courseId: integer('course_id').notNull().references(() => courses.id, { onDelete: 'cascade' }),
+    title: varchar({ length: 255 }).notNull(),
+    storageKey: varchar('storage_key', { length: 512 }),
+    publishState: publishStateEnum('publish_state').default('draft').notNull(),
+    mediaStatus: mediaStatusEnum('media_status').default('queued').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (t) => [
+    index('videos_tenant_id_idx').on(t.tenantId),
+    index('videos_course_id_idx').on(t.courseId),
+])
