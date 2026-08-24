@@ -79,6 +79,10 @@ npm run web:dev
 
 Web login (S1-09): Vite proxies `/api` → API (`localhost:3000`). Access token stays in Redux memory; refresh uses the HttpOnly cookie (`credentials: 'include'`). Seed users: see Tenancy section above.
 
+### Media storage
+
+Object bytes go through a storage adapter (`apps/api/src/storage`). **Local disk** is active (`STORAGE_LOCAL_ROOT`, default `./.data/media`). S3 is documented as commented SDK-shaped code next to the local methods; set `S3_BUCKET` / `AWS_REGION` in `.env` only when you switch the provider later — they are unused today.
+
 ## Environments
 
 Config targets: `local`, `uat`, `prod` (see `.env.example`). Prototype hosting: EC2 + Docker for app + Postgres/Kafka/Redis. Scale path: see `docs/engineering/SCALE_PATH.md`.

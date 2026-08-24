@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { ContentModule } from './content/content.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { ContentModule } from './content/content.module';
     AuthModule,
     UsersModule,
     TenantsModule,
-    ContentModule
+    ContentModule,
+    StorageModule
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
