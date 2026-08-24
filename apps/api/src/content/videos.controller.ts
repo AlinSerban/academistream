@@ -8,12 +8,15 @@ import {
     Patch,
     Post,
     Req,
+    UploadedFile,
+    UseInterceptors,
 } from "@nestjs/common"
 import { VideosService } from "./videos.service"
 import type { JwtPayload } from "../auth/types"
 import type { Request } from "express"
 import type { CreateVideoInput, PublishVideoInput, UpdateVideoInput } from "./types"
 import { Roles } from "../auth/roles.decorator"
+import { FileInterceptor } from "@nestjs/platform-express"
 
 @Roles('tenant_admin', 'instructor')
 @Controller('videos')
@@ -42,6 +45,13 @@ export class VideosController {
     create(@Body() body: CreateVideoInput, @Req() req: Request) {
         const tenantId = this.getTenantId(req.user as JwtPayload);
         return this.videosService.create(tenantId, body);
+    }
+
+    @Post(':id/upload')
+    @UseInterceptors(FileInterceptor('file'))
+    upload(@Param('id') videoId: string, @UploadedFile() file: Express.Multer.File, @Req() req: Request) {
+        const tenantId = this.getTenantId(req.user as JwtPayload);
+        return this.videosService.uploadVideo(Number(videoId), tenantId, file);
     }
 
     @Patch(':id/publish')

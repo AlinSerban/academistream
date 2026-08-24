@@ -4,9 +4,11 @@ import { CoursesController } from "./courses.controller";
 import { CoursesService } from "./courses.service";
 import { VideosController } from "./videos.controller";
 import { VideosService } from "./videos.service";
+import { StorageModule } from "../storage/storage.module";
+import { KafkaModule } from "../kafka/kafka.module";
 
 @Module({
-    imports: [DbModule],
+    imports: [DbModule, StorageModule, KafkaModule],
     providers: [CoursesService, VideosService],
     exports: [CoursesService, VideosService],
     controllers: [CoursesController, VideosController]
