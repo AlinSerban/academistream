@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from '../db/db.module';
-import type { Db } from '../db/client';
-import { tenantMemberships, users } from '../db/schema';
+import type { Db } from '@academistream/db';
+import { tenantMemberships, users } from '@academistream/db';
 import { eq } from 'drizzle-orm';
 
 @Injectable()

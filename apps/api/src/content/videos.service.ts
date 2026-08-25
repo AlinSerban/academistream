@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { Db } from "../db/client";
+import type { Db } from "@academistream/db";
+import { courses, videos } from "@academistream/db";
 import { DRIZZLE } from "../db/db.module";
 import type { CreateVideoInput, PublishState, UpdateVideoInput } from "./types";
-import { courses, videos } from "../db/schema";
 import { eq, and } from 'drizzle-orm';
 import type { StorageService } from "../storage/storage.types";
 import { STORAGE } from "../storage/storage.module";

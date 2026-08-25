@@ -34,6 +34,7 @@
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.2",
     "kafkajs": "^2.2.4",
+    "@academistream/db": "*",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.23.0",

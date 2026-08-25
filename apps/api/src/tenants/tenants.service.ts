@@ -1,8 +1,8 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { DRIZZLE } from "../db/db.module";
-import type { Db } from '../db/client';
+import type { Db } from '@academistream/db';
 import type { CreateTenantInput } from "./types";
-import { tenantMemberships, tenants, users } from "../db/schema";
+import { tenantMemberships, tenants, users } from "@academistream/db";
 import bcrypt from 'bcrypt';
 import { eq } from 'drizzle-orm';
 

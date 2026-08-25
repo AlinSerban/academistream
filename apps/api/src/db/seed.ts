@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt';
 import { eq, and } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { tenants, users, tenantMemberships } from './schema';
+import { tenants, users, tenantMemberships } from '@academistream/db';
 
 dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
 

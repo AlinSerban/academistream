@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { Db } from "../db/client";
+import type { Db } from "@academistream/db";
+import { courses } from "@academistream/db";
 import { DRIZZLE } from "../db/db.module";
 import type { CreateCourseInput } from "./types";
-import { courses } from "../db/schema";
 import { eq, and } from 'drizzle-orm';
 
 @Injectable()

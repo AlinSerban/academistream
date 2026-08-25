@@ -35,7 +35,7 @@ npm run db:migrate -w @academistream/api
 npm run db:seed
 ```
 
-ORM/migrations: Drizzle in `apps/api`.
+ORM/migrations: Drizzle schema lives in `@academistream/db` (`packages/db`); migrate/seed scripts stay in `apps/api`.
 
 ### Tenancy & isolation
 
@@ -81,11 +81,13 @@ Web login (S1-09): Vite proxies `/api` → API (`localhost:3000`). Access token 
 
 ### Media storage
 
-Object bytes go through a storage adapter (`apps/api/src/storage`). **Local disk** is active (`STORAGE_LOCAL_ROOT`, default `./.data/media`). S3 is documented as commented SDK-shaped code next to the local methods; set `S3_BUCKET` / `AWS_REGION` in `.env` only when you switch the provider later — they are unused today.
+Object bytes go through a storage adapter (`apps/api/src/storage`). **Local disk** is active (`STORAGE_LOCAL_ROOT`, default `.data/media` under the **monorepo root** — both API and worker resolve relative paths from the repo root so they share the same files). S3 is documented as commented SDK-shaped code next to the local methods; set `S3_BUCKET` / `AWS_REGION` in `.env` only when you switch the provider later — they are unused today.
 
-### Video upload + Kafka
+### Video upload + Kafka + worker
 
-`POST /videos/:id/upload` accepts multipart field `file`, writes via the storage adapter, sets `mediaStatus` to `queued`, then produces a job to Kafka topic `video.processing` (`KAFKA_VIDEO_TOPIC`; brokers `KAFKA_BROKERS=localhost:29092`). Payload: `{ videoId, tenantId, storageKey }`. The worker consumes this in S2-05.
+`POST /videos/:id/upload` accepts multipart field `file`, writes via the storage adapter, sets `mediaStatus` to `queued`, then produces a job to Kafka topic `video.processing` (`KAFKA_VIDEO_TOPIC`; brokers `KAFKA_BROKERS=localhost:29092`). Payload: `{ videoId, tenantId, storageKey }`.
+
+`npm run worker:dev` runs the consumer: it updates the same Postgres (`DATABASE_URL`) via `@academistream/db`, sets `processing`, checks the file exists, then `ready` or `failed`. Real MediaConvert is commented next to that stub.
 
 ## Environments
 

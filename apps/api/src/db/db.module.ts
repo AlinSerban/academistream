@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { createDb } from "./client";
+import { createDb } from "@academistream/db";
 
 export const DRIZZLE = Symbol('DRIZZLE');
 
@@ -19,7 +19,5 @@ export const DRIZZLE = Symbol('DRIZZLE');
         }
     ],
     exports: [DRIZZLE]
-
 })
-
 export class DbModule { }

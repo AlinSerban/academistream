@@ -1,7 +1,7 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { DRIZZLE } from './db/db.module';
 import { sql } from 'drizzle-orm'
-import type { Db } from './db/client'
+import type { Db } from '@academistream/db'
 import { Public } from './auth/public.decorator';
 
 @Controller('health')
