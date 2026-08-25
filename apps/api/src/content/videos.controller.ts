@@ -41,6 +41,16 @@ export class VideosController {
         return this.videosService.getVideoById(Number(videoId), tenantId);
     }
 
+    @Roles('tenant_admin', 'instructor', 'learner')
+    @Get(':id/playback')
+    getPlaybackUrl(@Param('id') videoId: string, @Req() req: Request) {
+        const user = req.user as JwtPayload;
+        const tenantId = this.getTenantId(user);
+        const role = user.roles[0]?.role;
+        if (role == null) throw new ForbiddenException();
+        return this.videosService.getPlaybackUrl(Number(videoId), tenantId, role);
+    }
+
     @Post('create')
     create(@Body() body: CreateVideoInput, @Req() req: Request) {
         const tenantId = this.getTenantId(req.user as JwtPayload);

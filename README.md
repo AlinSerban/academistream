@@ -89,6 +89,8 @@ Object bytes go through a storage adapter (`apps/api/src/storage`). **Local disk
 
 `npm run worker:dev` runs the consumer: it updates the same Postgres (`DATABASE_URL`) via `@academistream/db`, sets `processing`, checks the file exists, then `ready` or `failed`. Real MediaConvert is commented next to that stub.
 
+`GET /videos/:id/playback` returns a short-lived local URL (`{ url, expiresIn }`) for `ready` videos in the caller’s tenant. Learners may only play `published` content; admin/instructor can play drafts too. Cross-tenant and not-ready → 4xx. CloudFront/S3 signed GET is commented next to the local storage stub.
+
 ## Environments
 
 Config targets: `local`, `uat`, `prod` (see `.env.example`). Prototype hosting: EC2 + Docker for app + Postgres/Kafka/Redis. Scale path: see `docs/engineering/SCALE_PATH.md`.

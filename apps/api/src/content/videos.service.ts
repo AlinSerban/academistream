@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, ForbiddenException, NotFoundException } from "@nestjs/common";
 import type { Db } from "@academistream/db";
 import { courses, videos } from "@academistream/db";
 import { DRIZZLE } from "../db/db.module";
@@ -113,6 +113,19 @@ export class VideosService {
         });
 
         return updated;
+    }
+
+    async getPlaybackUrl(videoId: number, tenantId: number, role: string) {
+        const video = await this.getVideoById(videoId, tenantId);
+        if (video.mediaStatus !== 'ready' || video.storageKey == null)
+            throw new NotFoundException();
+
+        if (role === 'learner' && video.publishState !== 'published')
+            throw new ForbiddenException();
+
+        const url = await this.storage.getSignedGetUrl(video.storageKey);
+
+        return { url, expiresIn: 3600 };
     }
 
     private async assertCourseInTenant(courseId: number, tenantId: number) {
