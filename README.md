@@ -81,6 +81,8 @@ Web login (S1-09): Vite proxies `/api` → API (`localhost:3000`). Access token 
 
 After login, `/` is the thin content library (S2-08): list courses/videos, create+upload a file, poll `mediaStatus`, and fetch a playback URL when `ready`. Profile is at `/me`. Use a tenant admin or instructor (learners cannot list/upload).
 
+`/training` (S3): assign published ready videos to learners; learners report watch `%` (completion at ≥ 90%); admins see tenant progress/completions. Assignment target is **video** (not course).
+
 ### Media storage
 
 Object bytes go through a storage adapter (`apps/api/src/storage`). **Local disk** is active (`STORAGE_LOCAL_ROOT`, default `.data/media` under the **monorepo root** — both API and worker resolve relative paths from the repo root so they share the same files). S3 is documented as commented SDK-shaped code next to the local methods; set `S3_BUCKET` / `AWS_REGION` in `.env` only when you switch the provider later — they are unused today.

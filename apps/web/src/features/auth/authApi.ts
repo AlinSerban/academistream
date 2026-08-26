@@ -2,6 +2,7 @@ import { createApi } from '@reduxjs/toolkit/query/react'
 import { baseQueryWithReauth } from './baseQuery'
 import { clearSession, setAccessToken } from './authSlice'
 import { contentApi } from '../content/contentApi'
+import { trainingApi } from '../training/trainingApi'
 import type {
   LoginRequest,
   LoginResponse,
@@ -56,6 +57,7 @@ export const authApi = createApi({
           dispatch(clearSession())
           dispatch(authApi.util.resetApiState())
           dispatch(contentApi.util.resetApiState())
+          dispatch(trainingApi.util.resetApiState())
         }
       },
     }),

@@ -123,6 +123,12 @@ export function LibraryPage() {
         <div className="flex gap-2">
           <Link
             className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+            to="/training"
+          >
+            Training
+          </Link>
+          <Link
+            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
             to="/me"
           >
             Profile

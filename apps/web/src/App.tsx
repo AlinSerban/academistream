@@ -4,6 +4,7 @@ import { MePage } from './features/auth/MePage'
 import { RequireAuth } from './features/auth/RequireAuth'
 import { SessionBootstrap } from './features/auth/SessionBootstrap'
 import { LibraryPage } from './features/content/LibraryPage'
+import { TrainingPage } from './features/training/TrainingPage'
 
 export default function App() {
   return (
@@ -16,6 +17,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <LibraryPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/training"
+            element={
+              <RequireAuth>
+                <TrainingPage />
               </RequireAuth>
             }
           />

@@ -68,3 +68,41 @@ export const videos = pgTable('videos', {
     index('videos_tenant_id_idx').on(t.tenantId),
     index('videos_course_id_idx').on(t.courseId),
 ])
+
+/** Primary assignment target: a video in the tenant (S3 / E06). */
+export const assignments = pgTable('assignments', {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    tenantId: integer('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    videoId: integer('video_id').notNull().references(() => videos.id, { onDelete: 'cascade' }),
+    userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    assignedByUserId: integer('assigned_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+    unique().on(t.tenantId, t.videoId, t.userId),
+    index('assignments_tenant_id_idx').on(t.tenantId),
+    index('assignments_user_id_idx').on(t.userId),
+])
+
+export const watchProgress = pgTable('watch_progress', {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    tenantId: integer('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    videoId: integer('video_id').notNull().references(() => videos.id, { onDelete: 'cascade' }),
+    positionSeconds: integer('position_seconds').notNull().default(0),
+    percent: integer('percent').notNull().default(0),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (t) => [
+    unique().on(t.tenantId, t.userId, t.videoId),
+    index('watch_progress_tenant_id_idx').on(t.tenantId),
+])
+
+export const completions = pgTable('completions', {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    tenantId: integer('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    videoId: integer('video_id').notNull().references(() => videos.id, { onDelete: 'cascade' }),
+    completedAt: timestamp('completed_at').defaultNow().notNull(),
+}, (t) => [
+    unique().on(t.tenantId, t.userId, t.videoId),
+    index('completions_tenant_id_idx').on(t.tenantId),
+])

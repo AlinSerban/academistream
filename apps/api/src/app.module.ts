@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { ContentModule } from './content/content.module';
 import { StorageModule } from './storage/storage.module';
+import { TrainingModule } from './training/training.module';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { StorageModule } from './storage/storage.module';
     UsersModule,
     TenantsModule,
     ContentModule,
-    StorageModule
+    StorageModule,
+    TrainingModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
