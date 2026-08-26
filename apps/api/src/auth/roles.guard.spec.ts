@@ -69,4 +69,35 @@ describe('RolesGuard', () => {
       ForbiddenException,
     );
   });
+
+  it('allows learner when playback roles include learner', () => {
+    const learner: JwtPayload = {
+      sub: 4,
+      username: 'Acme Learner',
+      isPlatformAdmin: false,
+      roles: [{ tenantId: 10, role: 'learner' }],
+    };
+    reflector.getAllAndOverride.mockReturnValue([
+      'tenant_admin',
+      'instructor',
+      'learner',
+    ]);
+    expect(guard.canActivate(createContext(learner))).toBe(true);
+  });
+
+  it('forbids learner when only admin/instructor roles are required', () => {
+    const learner: JwtPayload = {
+      sub: 4,
+      username: 'Acme Learner',
+      isPlatformAdmin: false,
+      roles: [{ tenantId: 10, role: 'learner' }],
+    };
+    reflector.getAllAndOverride.mockReturnValue([
+      'tenant_admin',
+      'instructor',
+    ]);
+    expect(() => guard.canActivate(createContext(learner))).toThrow(
+      ForbiddenException,
+    );
+  });
 });
