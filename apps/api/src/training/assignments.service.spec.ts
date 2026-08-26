@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
+import { AuditService } from '../audit/audit.service'
 import { DRIZZLE } from '../db/db.module'
 import { AssignmentsService } from './assignments.service'
 
@@ -10,6 +11,7 @@ describe('AssignmentsService', () => {
     insert: jest.Mock
     delete: jest.Mock
   }
+  let audit: { record: jest.Mock }
 
   beforeEach(async () => {
     db = {
@@ -17,11 +19,13 @@ describe('AssignmentsService', () => {
       insert: jest.fn(),
       delete: jest.fn(),
     }
+    audit = { record: jest.fn().mockResolvedValue(undefined) }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AssignmentsService,
         { provide: DRIZZLE, useValue: db },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile()
 

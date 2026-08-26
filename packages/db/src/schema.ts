@@ -1,9 +1,10 @@
-import { integer, varchar, timestamp, boolean, pgTable, pgEnum, unique, index } from "drizzle-orm/pg-core";
+import { integer, varchar, timestamp, boolean, pgTable, pgEnum, unique, index, text } from "drizzle-orm/pg-core";
 
 export const tenantStatusEnum = pgEnum('tenant_status', ['active', 'suspended']);
 export const membershipRoles = pgEnum('membership_role', ['tenant_admin', 'instructor', 'learner']);
 export const publishStateEnum = pgEnum('publish_state', ['draft', 'published']);
 export const mediaStatusEnum = pgEnum('media_status', ['queued', 'processing', 'ready', 'failed']);
+export const inviteStatusEnum = pgEnum('invite_status', ['pending', 'accepted', 'revoked']);
 
 export const healthChecks = pgTable('health_checks', {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -105,4 +106,33 @@ export const completions = pgTable('completions', {
 }, (t) => [
     unique().on(t.tenantId, t.userId, t.videoId),
     index('completions_tenant_id_idx').on(t.tenantId),
+])
+
+export const auditEvents = pgTable('audit_events', {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    tenantId: integer('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    actorUserId: integer('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+    action: varchar({ length: 100 }).notNull(),
+    entityType: varchar('entity_type', { length: 100 }),
+    entityId: integer('entity_id'),
+    metadata: text('metadata'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+    index('audit_events_tenant_id_idx').on(t.tenantId),
+    index('audit_events_created_at_idx').on(t.createdAt),
+])
+
+export const invites = pgTable('invites', {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    tenantId: integer('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    email: varchar({ length: 255 }).notNull(),
+    role: membershipRoles('role').notNull(),
+    tokenHash: varchar('token_hash', { length: 255 }).notNull(),
+    status: inviteStatusEnum('status').notNull().default('pending'),
+    invitedByUserId: integer('invited_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: timestamp('expires_at').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+    index('invites_tenant_id_idx').on(t.tenantId),
+    index('invites_email_idx').on(t.email),
 ])

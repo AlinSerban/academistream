@@ -70,8 +70,14 @@ export class VideosController {
         @Body() body: PublishVideoInput,
         @Req() req: Request,
     ) {
-        const tenantId = this.getTenantId(req.user as JwtPayload);
-        return this.videosService.publish(Number(videoId), tenantId, body.publishState);
+        const user = req.user as JwtPayload;
+        const tenantId = this.getTenantId(user);
+        return this.videosService.publish(
+            Number(videoId),
+            tenantId,
+            body.publishState,
+            user.sub,
+        );
     }
 
     @Patch(':id')

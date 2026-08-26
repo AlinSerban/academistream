@@ -14,12 +14,14 @@ import {
     COMPLETION_PERCENT_THRESHOLD,
     type UpsertProgressInput,
 } from './types'
+import { AuditService } from '../audit/audit.service'
 
 @Injectable()
 export class ProgressService {
     constructor(
         @Inject(DRIZZLE) private readonly db: Db,
         private readonly assignmentsService: AssignmentsService,
+        private readonly audit: AuditService,
     ) { }
 
     async upsertMine(
@@ -160,6 +162,16 @@ export class ProgressService {
             .insert(completions)
             .values({ tenantId, userId, videoId })
             .returning()
+
+        if (created) {
+            await this.audit.record({
+                tenantId,
+                actorUserId: userId,
+                action: 'completion.created',
+                entityType: 'video',
+                entityId: videoId,
+            })
+        }
 
         return created ?? null
     }

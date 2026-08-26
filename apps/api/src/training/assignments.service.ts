@@ -15,10 +15,14 @@ import {
 import { and, eq } from 'drizzle-orm'
 import { DRIZZLE } from '../db/db.module'
 import type { CreateAssignmentInput } from './types'
+import { AuditService } from '../audit/audit.service'
 
 @Injectable()
 export class AssignmentsService {
-    constructor(@Inject(DRIZZLE) private readonly db: Db) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: Db,
+        private readonly audit: AuditService,
+    ) { }
 
     async create(
         tenantId: number,
@@ -39,6 +43,16 @@ export class AssignmentsService {
             .returning()
 
         if (!created) throw new NotFoundException()
+
+        await this.audit.record({
+            tenantId,
+            actorUserId: assignedByUserId,
+            action: 'assignment.created',
+            entityType: 'assignment',
+            entityId: created.id,
+            metadata: { videoId: input.videoId, userId: input.userId },
+        })
+
         return created
     }
 

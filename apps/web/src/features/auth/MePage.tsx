@@ -59,6 +59,12 @@ export function MePage() {
           >
             Training
           </Link>
+          <Link
+            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+            to="/org"
+          >
+            Org
+          </Link>
           <button
             className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50 disabled:opacity-60"
             type="button"

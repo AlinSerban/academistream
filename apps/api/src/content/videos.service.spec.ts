@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { AuditService } from '../audit/audit.service';
 import { DRIZZLE } from '../db/db.module';
 import { STORAGE } from '../storage/storage.module';
 import { KafkaProducerService } from '../kafka/kafka.producer';
@@ -13,6 +14,7 @@ describe('VideosService', () => {
   };
   let storage: { getSignedGetUrl: jest.Mock; putObject: jest.Mock };
   let kafka: { sendVideoProcessingJob: jest.Mock };
+  let audit: { record: jest.Mock };
 
   beforeEach(async () => {
     db = {
@@ -26,6 +28,7 @@ describe('VideosService', () => {
     kafka = {
       sendVideoProcessingJob: jest.fn(),
     };
+    audit = { record: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -33,6 +36,7 @@ describe('VideosService', () => {
         { provide: DRIZZLE, useValue: db },
         { provide: STORAGE, useValue: storage },
         { provide: KafkaProducerService, useValue: kafka },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 

@@ -10,6 +10,8 @@ import { TenantsModule } from './tenants/tenants.module';
 import { ContentModule } from './content/content.module';
 import { StorageModule } from './storage/storage.module';
 import { TrainingModule } from './training/training.module';
+import { AuditModule } from './audit/audit.module';
+import { OrgModule } from './org/org.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { TrainingModule } from './training/training.module';
     ContentModule,
     StorageModule,
     TrainingModule,
+    AuditModule,
+    OrgModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

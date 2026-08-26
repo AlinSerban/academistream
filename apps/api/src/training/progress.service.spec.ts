@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
+import { AuditService } from '../audit/audit.service'
 import { DRIZZLE } from '../db/db.module'
 import { AssignmentsService } from './assignments.service'
 import { ProgressService } from './progress.service'
@@ -9,6 +10,7 @@ describe('ProgressService', () => {
   let service: ProgressService
   let db: { select: jest.Mock; insert: jest.Mock; update: jest.Mock }
   let assignmentsService: { assertAssigned: jest.Mock }
+  let audit: { record: jest.Mock }
 
   const readyPublished = {
     id: 3,
@@ -26,12 +28,14 @@ describe('ProgressService', () => {
     assignmentsService = {
       assertAssigned: jest.fn().mockResolvedValue({ id: 1 }),
     }
+    audit = { record: jest.fn().mockResolvedValue(undefined) }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProgressService,
         { provide: DRIZZLE, useValue: db },
         { provide: AssignmentsService, useValue: assignmentsService },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile()
 

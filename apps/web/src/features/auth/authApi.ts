@@ -3,6 +3,7 @@ import { baseQueryWithReauth } from './baseQuery'
 import { clearSession, setAccessToken } from './authSlice'
 import { contentApi } from '../content/contentApi'
 import { trainingApi } from '../training/trainingApi'
+import { orgApi } from '../org/orgApi'
 import type {
   LoginRequest,
   LoginResponse,
@@ -58,6 +59,7 @@ export const authApi = createApi({
           dispatch(authApi.util.resetApiState())
           dispatch(contentApi.util.resetApiState())
           dispatch(trainingApi.util.resetApiState())
+          dispatch(orgApi.util.resetApiState())
         }
       },
     }),

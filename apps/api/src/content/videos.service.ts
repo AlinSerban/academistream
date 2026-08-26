@@ -7,6 +7,7 @@ import { eq, and } from 'drizzle-orm';
 import type { StorageService } from "../storage/storage.types";
 import { STORAGE } from "../storage/storage.module";
 import { KafkaProducerService } from "../kafka/kafka.producer";
+import { AuditService } from "../audit/audit.service";
 
 @Injectable()
 export class VideosService {
@@ -14,6 +15,7 @@ export class VideosService {
         @Inject(DRIZZLE) private readonly db: Db,
         @Inject(STORAGE) private readonly storage: StorageService,
         private readonly kafka: KafkaProducerService,
+        private readonly audit: AuditService,
     ) { }
 
     async create(tenantId: number, input: CreateVideoInput) {
@@ -41,7 +43,12 @@ export class VideosService {
         return updated;
     }
 
-    async publish(videoId: number, tenantId: number, publishState: PublishState) {
+    async publish(
+        videoId: number,
+        tenantId: number,
+        publishState: PublishState,
+        actorUserId?: number,
+    ) {
         const [updated] = await this.db
             .update(videos)
             .set({ publishState, updatedAt: new Date() })
@@ -49,6 +56,17 @@ export class VideosService {
             .returning();
 
         if (!updated) throw new NotFoundException();
+
+        if (publishState === 'published') {
+            await this.audit.record({
+                tenantId,
+                actorUserId,
+                action: 'video.published',
+                entityType: 'video',
+                entityId: videoId,
+            });
+        }
+
         return updated;
     }
 
