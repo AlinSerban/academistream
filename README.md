@@ -79,6 +79,8 @@ npm run web:dev
 
 Web login (S1-09): Vite proxies `/api` → API (`localhost:3000`). Access token stays in Redux memory; refresh uses the HttpOnly cookie (`credentials: 'include'`). Seed users: see Tenancy section above.
 
+After login, `/` is the thin content library (S2-08): list courses/videos, create+upload a file, poll `mediaStatus`, and fetch a playback URL when `ready`. Profile is at `/me`. Use a tenant admin or instructor (learners cannot list/upload).
+
 ### Media storage
 
 Object bytes go through a storage adapter (`apps/api/src/storage`). **Local disk** is active (`STORAGE_LOCAL_ROOT`, default `.data/media` under the **monorepo root** — both API and worker resolve relative paths from the repo root so they share the same files). S3 is documented as commented SDK-shaped code next to the local methods; set `S3_BUCKET` / `AWS_REGION` in `.env` only when you switch the provider later — they are unused today.

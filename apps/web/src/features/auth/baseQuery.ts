@@ -6,9 +6,7 @@ import {
 } from '@reduxjs/toolkit/query/react'
 import type { RootState } from '../../app/store'
 import { clearSession, setAccessToken } from './authSlice'
-import type { LoginResponse, MeResponse, MessageResponse } from './types'
-
-export type AuthApiData = LoginResponse | MeResponse | MessageResponse
+import type { LoginResponse } from './types'
 
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: '/api',
@@ -20,11 +18,11 @@ const rawBaseQuery = fetchBaseQuery({
     }
     return headers
   },
-}) as BaseQueryFn<string | FetchArgs, AuthApiData, FetchBaseQueryError>
+})
 
 export const baseQueryWithReauth: BaseQueryFn<
   string | FetchArgs,
-  AuthApiData,
+  unknown,
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
   let result = await rawBaseQuery(args, api, extraOptions)
@@ -49,6 +47,11 @@ export const baseQueryWithReauth: BaseQueryFn<
   return result
 }
 
-function isLoginResponse(data: AuthApiData): data is LoginResponse {
-  return 'access_token' in data && typeof data.access_token === 'string'
+function isLoginResponse(data: unknown): data is LoginResponse {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'access_token' in data &&
+    typeof (data as LoginResponse).access_token === 'string'
+  )
 }

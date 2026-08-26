@@ -1,6 +1,6 @@
 import type { SerializedError } from '@reduxjs/toolkit'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useLogoutMutation, useMeQuery } from './authApi'
 import type { Membership } from './types'
 
@@ -46,14 +46,22 @@ export function MePage() {
           <h1 className="text-2xl font-semibold text-slate-900">Academistream</h1>
           <p className="mt-1 text-sm text-slate-600">Signed in as {data.email}</p>
         </div>
-        <button
-          className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50 disabled:opacity-60"
-          type="button"
-          disabled={isLoggingOut}
-          onClick={() => void onLogout()}
-        >
-          {isLoggingOut ? 'Signing out…' : 'Log out'}
-        </button>
+        <div className="flex gap-2">
+          <Link
+            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+            to="/"
+          >
+            Library
+          </Link>
+          <button
+            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50 disabled:opacity-60"
+            type="button"
+            disabled={isLoggingOut}
+            onClick={() => void onLogout()}
+          >
+            {isLoggingOut ? 'Signing out…' : 'Log out'}
+          </button>
+        </div>
       </div>
 
       <dl className="space-y-3 text-sm">

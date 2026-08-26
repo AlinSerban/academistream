@@ -3,6 +3,7 @@ import { LoginPage } from './features/auth/LoginPage'
 import { MePage } from './features/auth/MePage'
 import { RequireAuth } from './features/auth/RequireAuth'
 import { SessionBootstrap } from './features/auth/SessionBootstrap'
+import { LibraryPage } from './features/content/LibraryPage'
 
 export default function App() {
   return (
@@ -12,6 +13,14 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route
             path="/"
+            element={
+              <RequireAuth>
+                <LibraryPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/me"
             element={
               <RequireAuth>
                 <MePage />
