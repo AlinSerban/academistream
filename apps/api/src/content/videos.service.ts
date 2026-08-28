@@ -8,6 +8,7 @@ import type { StorageService } from "../storage/storage.types";
 import { STORAGE } from "../storage/storage.module";
 import { KafkaProducerService } from "../kafka/kafka.producer";
 import { AuditService } from "../audit/audit.service";
+import { QuotasService } from "../quotas/quotas.service";
 
 @Injectable()
 export class VideosService {
@@ -16,10 +17,12 @@ export class VideosService {
         @Inject(STORAGE) private readonly storage: StorageService,
         private readonly kafka: KafkaProducerService,
         private readonly audit: AuditService,
+        private readonly quotas: QuotasService,
     ) { }
 
     async create(tenantId: number, input: CreateVideoInput) {
         await this.assertCourseInTenant(input.courseId, tenantId);
+        await this.quotas.assertCanAddVideo(tenantId);
 
         const [video] = await this.db.insert(videos).values({
             tenantId,

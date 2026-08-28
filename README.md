@@ -87,6 +87,17 @@ After login, `/` is the thin content library (S2-08): list courses/videos, creat
 
 **Audit actions (best-effort, never blocks the primary write):** `assignment.created`, `completion.created`, `video.published`, `invite.created`, `invite.accepted`, `invite.revoked`, `membership.removed`. Login success is not audited in this sprint.
 
+### Notifications & quotas (S5)
+
+In-app notifications (`notifications` table) for assignment, invite, completion, and media-failure events. Email uses a local/console mail stub (commented SES shape in `apps/api/src/mail`).
+
+- `GET /notifications` — current user's inbox (JWT tenant + user); `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`
+- `GET /quotas/usage` — tenant admin/instructor: limits (`maxUsers`, `maxVideos`; **null = unlimited**) vs current member/video counts
+- `PATCH /tenants/:id/quotas` — platform admin only
+- Enforcement: invite accept (new membership) and **video create** call `QuotasService` (4xx when at limit)
+
+**Web demo:** `/notifications` inbox; `/org` shows quota usage for tenant admins (instructors see quotas too). Trigger notifications by assigning training, inviting a user, completing a video, or failing worker processing. Platform admin can lower limits via API: `PATCH /tenants/:id/quotas` with `{ "maxUsers": 5, "maxVideos": 2 }`.
+
 ### Media storage
 
 Object bytes go through a storage adapter (`apps/api/src/storage`). **Local disk** is active (`STORAGE_LOCAL_ROOT`, default `.data/media` under the **monorepo root** — both API and worker resolve relative paths from the repo root so they share the same files). S3 is documented as commented SDK-shaped code next to the local methods; set `S3_BUCKET` / `AWS_REGION` in `.env` only when you switch the provider later — they are unused today.

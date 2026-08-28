@@ -7,6 +7,7 @@ import { LibraryPage } from './features/content/LibraryPage'
 import { TrainingPage } from './features/training/TrainingPage'
 import { AcceptInvitePage } from './features/org/AcceptInvitePage'
 import { OrgPage } from './features/org/OrgPage'
+import { NotificationsPage } from './features/notifications/NotificationsPage'
 
 export default function App() {
   return (
@@ -36,6 +37,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <OrgPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <RequireAuth>
+                <NotificationsPage />
               </RequireAuth>
             }
           />

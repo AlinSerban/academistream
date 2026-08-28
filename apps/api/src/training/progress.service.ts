@@ -6,7 +6,12 @@ import {
     NotFoundException,
 } from '@nestjs/common'
 import type { Db } from '@academistream/db'
-import { completions, videos, watchProgress } from '@academistream/db'
+import {
+    assignments,
+    completions,
+    videos,
+    watchProgress,
+} from '@academistream/db'
 import { and, eq } from 'drizzle-orm'
 import { DRIZZLE } from '../db/db.module'
 import { AssignmentsService } from './assignments.service'
@@ -15,6 +20,7 @@ import {
     type UpsertProgressInput,
 } from './types'
 import { AuditService } from '../audit/audit.service'
+import { NotificationsService } from '../notifications/notifications.service'
 
 @Injectable()
 export class ProgressService {
@@ -22,6 +28,7 @@ export class ProgressService {
         @Inject(DRIZZLE) private readonly db: Db,
         private readonly assignmentsService: AssignmentsService,
         private readonly audit: AuditService,
+        private readonly notifications: NotificationsService,
     ) { }
 
     async upsertMine(
@@ -171,6 +178,48 @@ export class ProgressService {
                 entityType: 'video',
                 entityId: videoId,
             })
+
+            const [video] = await this.db
+                .select({ title: videos.title })
+                .from(videos)
+                .where(
+                    and(eq(videos.id, videoId), eq(videos.tenantId, tenantId)),
+                )
+                .limit(1)
+
+            const [assignment] = await this.db
+                .select({ assignedByUserId: assignments.assignedByUserId })
+                .from(assignments)
+                .where(
+                    and(
+                        eq(assignments.tenantId, tenantId),
+                        eq(assignments.userId, userId),
+                        eq(assignments.videoId, videoId),
+                    ),
+                )
+                .limit(1)
+
+            const title = 'Training completed'
+            const body = video
+                ? `A learner completed: ${video.title}`
+                : 'A learner completed a video'
+
+            if (assignment?.assignedByUserId != null) {
+                await this.notifications.notify({
+                    tenantId,
+                    userId: assignment.assignedByUserId,
+                    type: 'completion.created',
+                    title,
+                    body,
+                })
+            } else {
+                await this.notifications.notifyTenantStaff({
+                    tenantId,
+                    type: 'completion.created',
+                    title,
+                    body,
+                })
+            }
         }
 
         return created ?? null

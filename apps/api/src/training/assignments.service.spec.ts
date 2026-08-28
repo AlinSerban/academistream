@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { AuditService } from '../audit/audit.service'
+import { NotificationsService } from '../notifications/notifications.service'
 import { DRIZZLE } from '../db/db.module'
 import { AssignmentsService } from './assignments.service'
 
@@ -12,6 +13,7 @@ describe('AssignmentsService', () => {
     delete: jest.Mock
   }
   let audit: { record: jest.Mock }
+  let notifications: { notify: jest.Mock }
 
   beforeEach(async () => {
     db = {
@@ -20,12 +22,14 @@ describe('AssignmentsService', () => {
       delete: jest.fn(),
     }
     audit = { record: jest.fn().mockResolvedValue(undefined) }
+    notifications = { notify: jest.fn().mockResolvedValue(undefined) }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AssignmentsService,
         { provide: DRIZZLE, useValue: db },
         { provide: AuditService, useValue: audit },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile()
 
@@ -48,7 +52,7 @@ describe('AssignmentsService', () => {
 
   it('create assigns learner to published video in tenant', async () => {
     mockSelectLimit([
-      { id: 3, tenantId: 10, publishState: 'published' },
+      { id: 3, tenantId: 10, publishState: 'published', title: 'Safety 101' },
     ])
     // second select for learner membership
     const limit2 = jest.fn().mockResolvedValue([
@@ -61,7 +65,7 @@ describe('AssignmentsService', () => {
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
             limit: jest.fn().mockResolvedValue([
-              { id: 3, tenantId: 10, publishState: 'published' },
+              { id: 3, tenantId: 10, publishState: 'published', title: 'Safety 101' },
             ]),
           }),
         }),
@@ -87,6 +91,13 @@ describe('AssignmentsService', () => {
       videoId: 3,
       userId: 4,
       assignedByUserId: 2,
+    })
+    expect(notifications.notify).toHaveBeenCalledWith({
+      tenantId: 10,
+      userId: 4,
+      type: 'assignment.created',
+      title: 'New assignment',
+      body: 'You were assigned: Safety 101',
     })
   })
 

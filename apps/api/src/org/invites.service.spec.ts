@@ -2,6 +2,8 @@ import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import bcrypt from 'bcrypt'
 import { AuditService } from '../audit/audit.service'
+import { NotificationsService } from '../notifications/notifications.service'
+import { QuotasService } from '../quotas/quotas.service'
 import { DRIZZLE } from '../db/db.module'
 import { InvitesService } from './invites.service'
 
@@ -13,6 +15,8 @@ describe('InvitesService', () => {
     update: jest.Mock
   }
   let audit: { record: jest.Mock }
+  let notifications: { notify: jest.Mock }
+  let quotas: { assertCanAddMember: jest.Mock }
 
   beforeEach(async () => {
     db = {
@@ -21,12 +25,16 @@ describe('InvitesService', () => {
       update: jest.fn(),
     }
     audit = { record: jest.fn().mockResolvedValue(undefined) }
+    notifications = { notify: jest.fn().mockResolvedValue(undefined) }
+    quotas = { assertCanAddMember: jest.fn().mockResolvedValue(undefined) }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InvitesService,
         { provide: DRIZZLE, useValue: db },
         { provide: AuditService, useValue: audit },
+        { provide: NotificationsService, useValue: notifications },
+        { provide: QuotasService, useValue: quotas },
       ],
     }).compile()
 
@@ -146,5 +154,6 @@ describe('InvitesService', () => {
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'invite.accepted', tenantId: 10 }),
     )
+    expect(quotas.assertCanAddMember).toHaveBeenCalledWith(10)
   })
 })

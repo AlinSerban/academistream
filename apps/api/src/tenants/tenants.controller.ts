@@ -1,13 +1,18 @@
-import { Body, Controller, ForbiddenException, Get, Post, Req } from "@nestjs/common"
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Req } from "@nestjs/common"
 import { TenantsService } from "./tenants.service"
 import { Roles } from "../auth/roles.decorator"
 import type { CreateTenantInput } from "./types"
 import type { Request } from "express"
 import type { JwtPayload } from "../auth/types"
+import { QuotasService } from "../quotas/quotas.service"
+import type { UpdateQuotasInput } from "../quotas/types"
 
 @Controller('tenants')
 export class TenantsController {
-    constructor(private readonly tenantsService: TenantsService) { }
+    constructor(
+        private readonly tenantsService: TenantsService,
+        private readonly quotasService: QuotasService,
+    ) { }
 
     @Post('register')
     @Roles('platform_admin')
@@ -25,5 +30,14 @@ export class TenantsController {
         }
 
         return this.tenantsService.getMe(tenantId);
+    }
+
+    @Patch(':id/quotas')
+    @Roles('platform_admin')
+    updateQuotas(
+        @Param('id') id: string,
+        @Body() body: UpdateQuotasInput,
+    ) {
+        return this.quotasService.updateLimits(Number(id), body);
     }
 }

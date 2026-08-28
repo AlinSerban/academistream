@@ -60,7 +60,14 @@ async function getOrCreateTenant(
     return existing[0];
   }
 
-  const [created] = await db.insert(tenants).values({ name }).returning();
+  const [created] = await db
+    .insert(tenants)
+    .values({
+      name,
+      maxUsers: 500,
+      maxVideos: 500,
+    })
+    .returning();
   return created;
 }
 

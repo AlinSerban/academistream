@@ -16,12 +16,14 @@ import { and, eq } from 'drizzle-orm'
 import { DRIZZLE } from '../db/db.module'
 import type { CreateAssignmentInput } from './types'
 import { AuditService } from '../audit/audit.service'
+import { NotificationsService } from '../notifications/notifications.service'
 
 @Injectable()
 export class AssignmentsService {
     constructor(
         @Inject(DRIZZLE) private readonly db: Db,
         private readonly audit: AuditService,
+        private readonly notifications: NotificationsService,
     ) { }
 
     async create(
@@ -29,7 +31,7 @@ export class AssignmentsService {
         assignedByUserId: number,
         input: CreateAssignmentInput,
     ) {
-        await this.assertVideoInTenant(input.videoId, tenantId)
+        const video = await this.assertVideoInTenant(input.videoId, tenantId)
         await this.assertLearnerInTenant(input.userId, tenantId)
 
         const [created] = await this.db
@@ -51,6 +53,14 @@ export class AssignmentsService {
             entityType: 'assignment',
             entityId: created.id,
             metadata: { videoId: input.videoId, userId: input.userId },
+        })
+
+        await this.notifications.notify({
+            tenantId,
+            userId: input.userId,
+            type: 'assignment.created',
+            title: 'New assignment',
+            body: `You were assigned: ${video.title}`,
         })
 
         return created

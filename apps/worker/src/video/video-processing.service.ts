@@ -6,6 +6,7 @@ import path from 'path';
 import { eq, and } from 'drizzle-orm';
 import { ConfigService } from '@nestjs/config';
 import { DRIZZLE } from '../db/db.module';
+import { NotificationsService } from '../notifications/notifications.service';
 import { resolveStorageRoot } from '../storage/resolve-storage-root';
 
 @Injectable()
@@ -15,7 +16,8 @@ export class VideoProcessingService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: Db,
-        config: ConfigService
+        config: ConfigService,
+        private readonly notifications: NotificationsService,
     ) {
         this.rootDir = resolveStorageRoot(config.get<string>('STORAGE_LOCAL_ROOT'));
     }
@@ -48,7 +50,23 @@ export class VideoProcessingService {
         }
         catch {
             await this.setStatus(job, 'failed')
+            await this.notifyMediaFailed(job, video.title)
         }
+    }
+
+    /**
+     * Videos have no uploader column — notify tenant_admin, else first instructor.
+     */
+    private async notifyMediaFailed(
+        job: VideoProcessingJob,
+        videoTitle: string,
+    ): Promise<void> {
+        await this.notifications.notifyTenantStaff({
+            tenantId: job.tenantId,
+            type: 'video.media_failed',
+            title: 'Video processing failed',
+            body: `Processing failed for: ${videoTitle}`,
+        })
     }
 
     private async findVideo(videoId: number, tenantId: number) {

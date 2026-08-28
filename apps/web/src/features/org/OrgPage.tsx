@@ -11,6 +11,7 @@ import {
   useRevokeInviteMutation,
 } from './orgApi'
 import type { InviteRole } from './types'
+import { useGetQuotaUsageQuery } from '../quotas/quotasApi'
 
 export function OrgPage() {
   const { data: me } = useMeQuery()
@@ -43,6 +44,12 @@ export function OrgPage() {
           </Link>
           <Link
             className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+            to="/notifications"
+          >
+            Notifications
+          </Link>
+          <Link
+            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
             to="/me"
           >
             Profile
@@ -52,12 +59,14 @@ export function OrgPage() {
 
       {isAdmin ? (
         <>
+          <QuotasSection />
           <InviteSection />
           <MembersSection />
           <CsvExportSection />
         </>
       ) : null}
       {canSeeAudit ? <AuditSection /> : null}
+      {role === 'instructor' ? <QuotasSection /> : null}
       {!isAdmin && !canSeeAudit ? (
         <p className="text-sm text-slate-600">
           Org admin tools require tenant_admin (audit also visible to
@@ -276,6 +285,57 @@ function CsvExportSection() {
           {error}
         </p>
       ) : null}
+    </section>
+  )
+}
+
+function QuotasSection() {
+  const { data, isError } = useGetQuotaUsageQuery()
+
+  if (isError) {
+    return (
+      <section className="mb-10">
+        <h2 className="text-lg font-medium text-slate-900">Quotas</h2>
+        <p className="mt-2 text-sm text-red-600">Could not load quota usage.</p>
+      </section>
+    )
+  }
+
+  if (!data) {
+    return (
+      <section className="mb-10">
+        <h2 className="text-lg font-medium text-slate-900">Quotas</h2>
+        <p className="mt-2 text-sm text-slate-600">Loading usage…</p>
+      </section>
+    )
+  }
+
+  return (
+    <section className="mb-10">
+      <h2 className="text-lg font-medium text-slate-900">Quotas</h2>
+      <p className="mt-1 text-sm text-slate-600">
+        Tenant {data.tenantId} — members and videos vs plan limits.
+      </p>
+      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+        <div className="rounded border border-slate-200 p-3">
+          <dt className="text-slate-500">Members</dt>
+          <dd className="font-medium text-slate-900">
+            {data.usage.members}
+            {data.limits.maxUsers != null
+              ? ` / ${data.limits.maxUsers}`
+              : ' / unlimited'}
+          </dd>
+        </div>
+        <div className="rounded border border-slate-200 p-3">
+          <dt className="text-slate-500">Videos</dt>
+          <dd className="font-medium text-slate-900">
+            {data.usage.videos}
+            {data.limits.maxVideos != null
+              ? ` / ${data.limits.maxVideos}`
+              : ' / unlimited'}
+          </dd>
+        </div>
+      </dl>
     </section>
   )
 }

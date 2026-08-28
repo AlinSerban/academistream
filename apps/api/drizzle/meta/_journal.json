@@ -43,6 +43,13 @@
       "when": 1787732237773,
       "tag": "0005_early_hammerhead",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787857168231,
+      "tag": "0006_jittery_kitty_pryde",
+      "breakpoints": true
     }
   ]
 }

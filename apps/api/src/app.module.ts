@@ -12,6 +12,7 @@ import { StorageModule } from './storage/storage.module';
 import { TrainingModule } from './training/training.module';
 import { AuditModule } from './audit/audit.module';
 import { OrgModule } from './org/org.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -28,6 +29,8 @@ import { OrgModule } from './org/org.module';
     TrainingModule,
     AuditModule,
     OrgModule,
+    NotificationsModule,
+    QuotasModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

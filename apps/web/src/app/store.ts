@@ -4,6 +4,8 @@ import { authApi } from '../features/auth/authApi'
 import { contentApi } from '../features/content/contentApi'
 import { trainingApi } from '../features/training/trainingApi'
 import { orgApi } from '../features/org/orgApi'
+import { notificationsApi } from '../features/notifications/notificationsApi'
+import { quotasApi } from '../features/quotas/quotasApi'
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +14,8 @@ export const store = configureStore({
     [contentApi.reducerPath]: contentApi.reducer,
     [trainingApi.reducerPath]: trainingApi.reducer,
     [orgApi.reducerPath]: orgApi.reducer,
+    [notificationsApi.reducerPath]: notificationsApi.reducer,
+    [quotasApi.reducerPath]: quotasApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -19,6 +23,8 @@ export const store = configureStore({
       contentApi.middleware,
       trainingApi.middleware,
       orgApi.middleware,
+      notificationsApi.middleware,
+      quotasApi.middleware,
     ),
 })
 

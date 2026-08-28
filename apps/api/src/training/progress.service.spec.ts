@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { AuditService } from '../audit/audit.service'
+import { NotificationsService } from '../notifications/notifications.service'
 import { DRIZZLE } from '../db/db.module'
 import { AssignmentsService } from './assignments.service'
 import { ProgressService } from './progress.service'
@@ -11,6 +12,10 @@ describe('ProgressService', () => {
   let db: { select: jest.Mock; insert: jest.Mock; update: jest.Mock }
   let assignmentsService: { assertAssigned: jest.Mock }
   let audit: { record: jest.Mock }
+  let notifications: {
+    notify: jest.Mock
+    notifyTenantStaff: jest.Mock
+  }
 
   const readyPublished = {
     id: 3,
@@ -29,6 +34,10 @@ describe('ProgressService', () => {
       assertAssigned: jest.fn().mockResolvedValue({ id: 1 }),
     }
     audit = { record: jest.fn().mockResolvedValue(undefined) }
+    notifications = {
+      notify: jest.fn().mockResolvedValue(undefined),
+      notifyTenantStaff: jest.fn().mockResolvedValue(undefined),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -36,6 +45,7 @@ describe('ProgressService', () => {
         { provide: DRIZZLE, useValue: db },
         { provide: AssignmentsService, useValue: assignmentsService },
         { provide: AuditService, useValue: audit },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile()
 
@@ -148,6 +158,20 @@ describe('ProgressService', () => {
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
             limit: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([{ title: 'Safety 101' }]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([{ assignedByUserId: 2 }]),
           }),
         }),
       })

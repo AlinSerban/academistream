@@ -16,6 +16,10 @@ export const tenants = pgTable('tenants', {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     name: varchar({ length: 100 }).notNull(),
     status: tenantStatusEnum('status').notNull().default('active'),
+    /** Null = unlimited (S5 / E10). */
+    maxUsers: integer('max_users'),
+    /** Null = unlimited (S5 / E10). */
+    maxVideos: integer('max_videos'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull()
 })
@@ -135,4 +139,19 @@ export const invites = pgTable('invites', {
 }, (t) => [
     index('invites_tenant_id_idx').on(t.tenantId),
     index('invites_email_idx').on(t.email),
+])
+
+export const notifications = pgTable('notifications', {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    tenantId: integer('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    type: varchar({ length: 100 }).notNull(),
+    title: varchar({ length: 255 }),
+    body: text('body'),
+    readAt: timestamp('read_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+    index('notifications_tenant_user_idx').on(t.tenantId, t.userId),
+    index('notifications_user_id_idx').on(t.userId),
+    index('notifications_created_at_idx').on(t.createdAt),
 ])

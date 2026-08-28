@@ -3,17 +3,20 @@ import { Test, TestingModule } from '@nestjs/testing';
 import type { Request } from 'express';
 import { TenantsController } from './tenants.controller';
 import { TenantsService } from './tenants.service';
+import { QuotasService } from '../quotas/quotas.service';
 import type { JwtPayload } from '../auth/types';
 
 describe('TenantsController', () => {
   let controller: TenantsController;
   let tenantsService: { create: jest.Mock; getMe: jest.Mock };
+  let quotasService: { updateLimits: jest.Mock };
 
   beforeEach(async () => {
     tenantsService = {
       create: jest.fn(),
       getMe: jest.fn(),
     };
+    quotasService = { updateLimits: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TenantsController],
@@ -21,6 +24,10 @@ describe('TenantsController', () => {
         {
           provide: TenantsService,
           useValue: tenantsService,
+        },
+        {
+          provide: QuotasService,
+          useValue: quotasService,
         },
       ],
     }).compile();
@@ -84,5 +91,15 @@ describe('TenantsController', () => {
 
     expect(() => controller.me(req)).toThrow(ForbiddenException);
     expect(tenantsService.getMe).not.toHaveBeenCalled();
+  });
+
+  it('updateQuotas delegates to quotasService', async () => {
+    quotasService.updateLimits.mockResolvedValue({ id: 10, maxUsers: 50 })
+    await expect(
+      controller.updateQuotas('10', { maxUsers: 50 }),
+    ).resolves.toEqual({ id: 10, maxUsers: 50 })
+    expect(quotasService.updateLimits).toHaveBeenCalledWith(10, {
+      maxUsers: 50,
+    })
   });
 });

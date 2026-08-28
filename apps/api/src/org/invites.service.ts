@@ -11,6 +11,8 @@ import { randomBytes } from 'crypto'
 import bcrypt from 'bcrypt'
 import { DRIZZLE } from '../db/db.module'
 import { AuditService } from '../audit/audit.service'
+import { NotificationsService } from '../notifications/notifications.service'
+import { QuotasService } from '../quotas/quotas.service'
 import type { AcceptInviteInput, CreateInviteInput, InviteRole } from './types'
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -21,6 +23,8 @@ export class InvitesService {
     constructor(
         @Inject(DRIZZLE) private readonly db: Db,
         private readonly audit: AuditService,
+        private readonly notifications: NotificationsService,
+        private readonly quotas: QuotasService,
     ) { }
 
     async create(
@@ -78,6 +82,21 @@ export class InvitesService {
             entityType: 'invite',
             entityId: created.id,
             metadata: { email, role: input.role },
+        })
+
+        const [existingUser] = await this.db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1)
+
+        await this.notifications.notify({
+            tenantId,
+            userId: existingUser?.id,
+            type: 'invite.created',
+            title: 'Organization invite',
+            body: `You were invited as ${input.role}. Use your invite link to join.`,
+            email,
         })
 
         return {
@@ -203,6 +222,7 @@ export class InvitesService {
             .limit(1)
 
         if (!existingMembership) {
+            await this.quotas.assertCanAddMember(invite.tenantId)
             await this.db.insert(tenantMemberships).values({
                 userId: user.id,
                 tenantId: invite.tenantId,
