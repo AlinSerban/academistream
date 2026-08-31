@@ -98,11 +98,11 @@ In-app notifications (`notifications` table) for assignment, invite, completion,
 
 **Web demo:** `/notifications` inbox; `/org` shows quota usage for tenant admins (instructors see quotas too). Trigger notifications by assigning training, inviting a user, completing a video, or failing worker processing. Platform admin can lower limits via API: `PATCH /tenants/:id/quotas` with `{ "maxUsers": 5, "maxVideos": 2 }`.
 
-### Media storage (S6-01 baseline)
+### Media storage (S6-01 / S6-02)
 
 Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: local disk** (`STORAGE_PROVIDER=local`, `STORAGE_LOCAL_ROOT=.data/media` under the monorepo root — API and worker share the same path).
 
-**AWS media** (S3 + MediaConvert role) is provisioned with Terraform under `infra/terraform/` (S6-01). The app still uses the local adapter until S6-02 wires S3; see `infra/terraform/README.md` for `terraform output` → `.env` mapping (`S3_BUCKET`, `MEDIACONVERT_ROLE`, `AWS_REGION`). CloudFront playback vars are placeholders until S6-05.
+**AWS S3:** set `STORAGE_PROVIDER=s3` with `S3_BUCKET` and `AWS_REGION` (from `infra/terraform` outputs; see `infra/terraform/README.md`). Uploads use `PutObject`; playback returns an S3 presigned GET URL until CloudFront (S6-05). The worker still uses local disk until S6-03.
 
 ### Video upload + Kafka + worker
 
@@ -110,7 +110,7 @@ Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: l
 
 `npm run worker:dev` runs the consumer: it updates the same Postgres (`DATABASE_URL`) via `@academistream/db`, sets `processing`, checks the file exists, then `ready` or `failed`. Real MediaConvert is commented next to that stub.
 
-`GET /videos/:id/playback` returns a short-lived local URL (`{ url, expiresIn }`) for `ready` videos in the caller’s tenant. Learners may only play `published` content; admin/instructor can play drafts too. Cross-tenant and not-ready → 4xx. CloudFront/S3 signed GET is commented next to the local storage stub.
+`GET /videos/:id/playback` returns a short-lived URL (`{ url, expiresIn }`) for `ready` videos in the caller’s tenant — local `file://` or S3 presigned depending on `STORAGE_PROVIDER`. Learners may only play `published` content; admin/instructor can play drafts too. Cross-tenant and not-ready → 4xx. CloudFront signed URLs land in S6-05.
 
 ## Environments
 

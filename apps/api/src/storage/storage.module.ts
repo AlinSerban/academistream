@@ -1,7 +1,6 @@
 import { ConfigService } from "@nestjs/config";
-import { LocalStorageService } from "./local.storage";
 import { Module } from "@nestjs/common";
-import { resolveStorageRoot } from "./resolve-storage-root";
+import { createStorageService } from "./create-storage-service";
 
 export const STORAGE = Symbol('STORAGE');
 
@@ -9,10 +8,7 @@ export const STORAGE = Symbol('STORAGE');
     providers: [{
         provide: STORAGE,
         inject: [ConfigService],
-        useFactory: (config: ConfigService) => {
-            const root = resolveStorageRoot(config.get<string>('STORAGE_LOCAL_ROOT'));
-            return new LocalStorageService(root);
-        },
+        useFactory: (config: ConfigService) => createStorageService(config),
     }],
     exports: [STORAGE],
 })
