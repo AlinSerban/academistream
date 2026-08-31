@@ -1,9 +1,14 @@
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
+import { access } from 'fs/promises';
 import { DRIZZLE } from '../db/db.module';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { MediaConvertService } from './media-convert.service';
 import { VideoProcessingService } from './video-processing.service';
+
+jest.mock('fs/promises', () => ({
+    access: jest.fn(),
+}));
 
 describe('VideoProcessingService', () => {
     let service: VideoProcessingService;
@@ -33,6 +38,7 @@ describe('VideoProcessingService', () => {
         }).compile();
 
         service = module.get(VideoProcessingService);
+        jest.mocked(access).mockReset();
     });
 
     function mockVideoLookup(video: Record<string, unknown>) {
@@ -54,6 +60,7 @@ describe('VideoProcessingService', () => {
     }
 
     it('notifies tenant staff when local processing fails', async () => {
+        jest.mocked(access).mockRejectedValue(new Error('ENOENT'));
         mockVideoLookup({
             id: 3,
             tenantId: 10,
@@ -75,6 +82,64 @@ describe('VideoProcessingService', () => {
             title: 'Video processing failed',
             body: 'Processing failed for: Safety 101',
         });
+    });
+
+    it('marks local file ready with playback key when source exists', async () => {
+        jest.mocked(access).mockResolvedValue(undefined);
+
+        mockVideoLookup({
+            id: 3,
+            tenantId: 10,
+            title: 'Safety 101',
+            mediaStatus: 'queued',
+            mediaConvertJobId: null,
+        });
+
+        const setProcessing = jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+        });
+        const setReady = jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+        });
+        db.update
+            .mockReturnValueOnce({ set: setProcessing })
+            .mockReturnValueOnce({ set: setReady });
+
+        await service.handle({
+            videoId: 3,
+            tenantId: 10,
+            storageKey: 'tenants/10/videos/3/source.mp4',
+        });
+
+        expect(setProcessing).toHaveBeenCalledWith(
+            expect.objectContaining({ mediaStatus: 'processing' }),
+        );
+        expect(setReady).toHaveBeenCalledWith(
+            expect.objectContaining({
+                mediaStatus: 'ready',
+                playbackKey: 'tenants/10/videos/3/source.mp4',
+            }),
+        );
+        expect(notifications.notifyTenantStaff).not.toHaveBeenCalled();
+    });
+
+    it('skips duplicate Kafka delivery when video already ready', async () => {
+        mockVideoLookup({
+            id: 3,
+            tenantId: 10,
+            title: 'Safety 101',
+            mediaStatus: 'ready',
+            mediaConvertJobId: null,
+        });
+
+        await service.handle({
+            videoId: 3,
+            tenantId: 10,
+            storageKey: 'tenants/10/videos/3/source.mp4',
+        });
+
+        expect(db.update).not.toHaveBeenCalled();
+        expect(notifications.notifyTenantStaff).not.toHaveBeenCalled();
     });
 
     it('submits MediaConvert job and stores job id when STORAGE_PROVIDER=s3', async () => {

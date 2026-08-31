@@ -13,6 +13,7 @@ describe('VideosService', () => {
   let db: {
     select: jest.Mock;
     insert: jest.Mock;
+    update: jest.Mock;
   };
   let storage: { putObject: jest.Mock };
   let playbackUrls: { getSignedGetUrl: jest.Mock };
@@ -24,6 +25,7 @@ describe('VideosService', () => {
     db = {
       select: jest.fn(),
       insert: jest.fn(),
+      update: jest.fn(),
     };
     storage = {
       putObject: jest.fn(),
@@ -125,6 +127,55 @@ describe('VideosService', () => {
     expect(db.insert).not.toHaveBeenCalled()
   })
 
+  it('uploadVideo stores tenant-scoped key, queues media, and produces Kafka job', async () => {
+    mockSelectLimit([{ id: 3, tenantId: 10, courseId: 1, title: 'Clip' }]);
+    const updated = {
+      id: 3,
+      tenantId: 10,
+      storageKey: 'tenants/10/videos/3/source.mp4',
+      mediaStatus: 'queued' as const,
+    };
+    const returning = jest.fn().mockResolvedValue([updated]);
+    const where = jest.fn().mockReturnValue({ returning });
+    const set = jest.fn().mockReturnValue({ where });
+    db.update.mockReturnValue({ set });
+
+    const file = {
+      buffer: Buffer.from('video-bytes'),
+      mimetype: 'video/mp4',
+    } as Express.Multer.File;
+    storage.putObject.mockResolvedValue({ key: 'tenants/10/videos/3/source.mp4' });
+
+    await expect(service.uploadVideo(3, 10, file)).resolves.toEqual(updated);
+
+    expect(storage.putObject).toHaveBeenCalledWith({
+      key: 'tenants/10/videos/3/source.mp4',
+      body: file.buffer,
+      contentType: 'video/mp4',
+    });
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storageKey: 'tenants/10/videos/3/source.mp4',
+        mediaStatus: 'queued',
+      }),
+    );
+    expect(kafka.sendVideoProcessingJob).toHaveBeenCalledWith({
+      videoId: 3,
+      tenantId: 10,
+      storageKey: 'tenants/10/videos/3/source.mp4',
+    });
+  });
+
+  it('uploadVideo rejects cross-tenant access', async () => {
+    mockSelectLimit([]);
+
+    const file = { buffer: Buffer.from('x'), mimetype: 'video/mp4' } as Express.Multer.File;
+
+    await expect(service.uploadVideo(3, 20, file)).rejects.toThrow(NotFoundException);
+    expect(storage.putObject).not.toHaveBeenCalled();
+    expect(kafka.sendVideoProcessingJob).not.toHaveBeenCalled();
+  });
+
   it('getPlaybackUrl succeeds for ready published video', async () => {
     mockSelectLimit([readyPublished]);
     playbackUrls.getSignedGetUrl.mockResolvedValue('file:///tmp/video.mp4');
@@ -135,6 +186,27 @@ describe('VideosService', () => {
 
     expect(playbackUrls.getSignedGetUrl).toHaveBeenCalledWith(
       readyPublished.storageKey,
+    );
+  });
+
+  it('getPlaybackUrl prefers playbackKey for transcoded output', async () => {
+    mockSelectLimit([
+      {
+        ...readyPublished,
+        playbackKey: 'tenants/10/videos/3/output/source.mp4',
+      },
+    ]);
+    playbackUrls.getSignedGetUrl.mockResolvedValue('https://d123.cloudfront.net/signed');
+
+    await expect(
+      service.getPlaybackUrl(3, 10, 'learner'),
+    ).resolves.toEqual({
+      url: 'https://d123.cloudfront.net/signed',
+      expiresIn: 3600,
+    });
+
+    expect(playbackUrls.getSignedGetUrl).toHaveBeenCalledWith(
+      'tenants/10/videos/3/output/source.mp4',
     );
   });
 
