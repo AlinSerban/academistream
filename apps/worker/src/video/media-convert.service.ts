@@ -1,8 +1,8 @@
 import {
     CreateJobCommand,
-    DescribeEndpointsCommand,
     MediaConvertClient,
 } from '@aws-sdk/client-mediaconvert';
+import { mediaConvertRegionalEndpoint } from './media-convert-endpoint';
 import { buildMediaConvertJobSettings } from './media-convert-job-settings';
 
 export class MediaConvertService {
@@ -38,15 +38,10 @@ export class MediaConvertService {
         }
 
         if (!this.client) {
-            const discovery = new MediaConvertClient({ region: this.region });
-            const { Endpoints } = await discovery.send(
-                new DescribeEndpointsCommand({ MaxResults: 1 }),
-            );
-            const endpoint = Endpoints?.[0]?.Url;
-            if (!endpoint) {
-                throw new Error('MediaConvert endpoint not found');
-            }
-            this.client = new MediaConvertClient({ region: this.region, endpoint });
+            this.client = new MediaConvertClient({
+                region: this.region,
+                endpoint: mediaConvertRegionalEndpoint(this.region),
+            });
         }
 
         return this.client;
