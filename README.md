@@ -114,6 +114,52 @@ Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: l
 
 `GET /videos/:id/playback` returns a short-lived URL (`{ url, expiresIn: 3600 }`) for `ready` videos — local `file://`, S3 presigned, or **CloudFront signed** when `CLOUDFRONT_*` env vars are set. Uses `playbackKey` when present (transcoded output). Learners may only play `published` content; admin/instructor can play drafts. Cross-tenant and not-ready → 4xx.
 
+The library page (`/`) polls video list every **2 seconds** while any video is `queued` or `processing`, then stops when all are `ready` or `failed`. Click **Play** on a ready video to fetch the signed URL; HTTPS URLs (S3/CloudFront) play inline in `<video>`; local `file://` URLs show a path hint only (browser security).
+
+### Demo: local vs AWS (S6-07)
+
+#### Local path (default — dev / CI)
+
+1. `cp .env.example .env` — keep `STORAGE_PROVIDER=local`.
+2. `docker compose up -d`, migrate, seed.
+3. Run API, worker, and web (`npm run api:dev`, `npm run worker:dev`, `npm run web:dev`).
+4. Sign in as `instructor@acme.local`, open `/`, create course + upload a small MP4.
+5. **Status flow:** `queued` → `processing` (brief) → `ready` (worker checks file on disk under `.data/media`).
+6. Publish the video (API or future UI), then **Play** — playback URL is `file://` (not inline in browser; path shown on page).
+
+#### AWS path (S3 + MediaConvert + optional CloudFront)
+
+**Prerequisites:** AWS credentials with S3 + MediaConvert + `iam:PassRole` on the MediaConvert role. See `infra/terraform/README.md`.
+
+| Step | Action |
+|------|--------|
+| 1 | `cd infra/terraform && terraform apply` |
+| 2 | Copy outputs into `.env` (or merge from `.env.aws.example`) |
+| 3 | Set **`STORAGE_PROVIDER=s3`** on **both API and worker** (same `.env` or process env) |
+| 4 | Set `AWS_REGION`, `S3_BUCKET`, `MEDIACONVERT_ROLE` |
+| 5 | *(Optional)* CloudFront: OAC distribution + `CLOUDFRONT_DOMAIN`, `CLOUDFRONT_KEY_PAIR_ID`, `CLOUDFRONT_PRIVATE_KEY_PATH` |
+| 6 | Restart API + worker after env changes |
+| 7 | Upload via `/` — **status flow:** `queued` → `processing` → `ready` (worker submits MediaConvert; poller completes in ~15s–minutes depending on file size) |
+| 8 | **Play** on library page — inline MP4 from S3 presigned or CloudFront signed URL |
+
+**`mediaStatus` reference**
+
+| Status | Meaning |
+|--------|---------|
+| `queued` | Uploaded; Kafka job not yet consumed or worker starting |
+| `processing` | Worker running (local file check or MediaConvert job in flight) |
+| `ready` | Playback allowed; `playback_key` set (transcoded output on AWS, source key on local) |
+| `failed` | Processing error; tenant staff notified — see `/notifications` |
+
+**Cost cautions (real AWS)**
+
+- **MediaConvert** bills per output minute — use short test clips while developing.
+- **S3** storage for source + transcoded MP4 under `tenants/{id}/videos/{id}/`.
+- **Egress** if clients download/play via S3 presigned URLs; CloudFront can reduce origin egress but has its own pricing.
+- Tear down test objects or destroy the Terraform stack when not experimenting.
+
+See also: `.env.aws.example` for a copy-paste AWS env block.
+
 ## Environments
 
 Config targets: `local`, `uat`, `prod` (see `.env.example`). Prototype hosting: EC2 + Docker for app + Postgres/Kafka/Redis. Scale path: see `docs/engineering/SCALE_PATH.md`.

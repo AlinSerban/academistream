@@ -318,6 +318,8 @@ function VideoRow({
   playbackError: boolean
   onPlayback: () => void
 }) {
+  const playableInBrowser = playbackUrl != null && isBrowserPlayableUrl(playbackUrl)
+
   return (
     <li className="border-t border-slate-200 pt-3 text-sm text-slate-900">
       <p className="font-medium">
@@ -326,6 +328,14 @@ function VideoRow({
       <p className="mt-1 text-slate-600">
         {courseTitle} · {video.publishState} · media: {video.mediaStatus}
       </p>
+      {video.mediaStatus === 'failed' ? (
+        <p className="mt-2 text-sm text-red-600" role="alert">
+          Processing failed.{' '}
+          <Link className="underline hover:text-red-800" to="/notifications">
+            Check notifications
+          </Link>
+        </p>
+      ) : null}
       {video.mediaStatus === 'ready' ? (
         <div className="mt-2">
           <button
@@ -334,15 +344,26 @@ function VideoRow({
             disabled={isFetchingPlayback}
             onClick={onPlayback}
           >
-            {isFetchingPlayback ? 'Fetching…' : 'Get playback URL'}
+            {isFetchingPlayback ? 'Loading…' : playbackUrl ? 'Reload player' : 'Play'}
           </button>
-          {playbackUrl ? (
-            <p className="mt-2 break-all text-xs text-slate-700">
+          {playableInBrowser ? (
+            <video
+              className="mt-3 max-h-80 w-full rounded border border-slate-200 bg-black"
+              controls
+              preload="metadata"
+              src={playbackUrl}
+            >
+              Your browser does not support inline video playback.
+            </video>
+          ) : null}
+          {playbackUrl && !playableInBrowser ? (
+            <p className="mt-2 text-xs text-slate-600">
+              Inline playback needs an HTTPS URL (S3 presigned or CloudFront). Local{' '}
+              <code className="rounded bg-slate-100 px-1">file://</code> URLs cannot load in the
+              browser — open from disk if testing locally:{' '}
               <a
-                className="underline hover:text-slate-900"
+                className="break-all underline hover:text-slate-900"
                 href={playbackUrl}
-                target="_blank"
-                rel="noreferrer"
               >
                 {playbackUrl}
               </a>
@@ -357,6 +378,11 @@ function VideoRow({
       ) : null}
     </li>
   )
+}
+
+/** Browsers can only load http(s) in a video element; local dev returns file:// URLs. */
+function isBrowserPlayableUrl(url: string): boolean {
+  return url.startsWith('http://') || url.startsWith('https://')
 }
 
 function getListErrorMessage(
