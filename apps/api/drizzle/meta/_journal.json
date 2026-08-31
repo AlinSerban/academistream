@@ -50,6 +50,13 @@
       "when": 1787857168231,
       "tag": "0006_jittery_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788178793316,
+      "tag": "0007_milky_swarm",
+      "breakpoints": true
     }
   ]
 }

@@ -65,6 +65,8 @@ export const videos = pgTable('videos', {
     courseId: integer('course_id').notNull().references(() => courses.id, { onDelete: 'cascade' }),
     title: varchar({ length: 255 }).notNull(),
     storageKey: varchar('storage_key', { length: 512 }),
+    /** AWS MediaConvert job id while transcoding (S6-03); cleared or kept after S6-04 completion. */
+    mediaConvertJobId: varchar('mediaconvert_job_id', { length: 64 }),
     publishState: publishStateEnum('publish_state').default('draft').notNull(),
     mediaStatus: mediaStatusEnum('media_status').default('queued').notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),

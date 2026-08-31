@@ -1,0 +1,1 @@
+ALTER TABLE "videos" ADD COLUMN "mediaconvert_job_id" varchar(64);
