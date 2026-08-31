@@ -74,7 +74,19 @@ When enabling AWS:
 | `AWS_REGION` | `terraform output aws_region` |
 | `S3_BUCKET` | `terraform output s3_bucket_name` |
 | `MEDIACONVERT_ROLE` | `terraform output mediaconvert_role_arn` |
-| `CLOUDFRONT_*` | Added in S6-05 (not in Terraform yet) |
+| `CLOUDFRONT_DOMAIN` | CloudFront distribution hostname (console; not in Terraform yet) |
+| `CLOUDFRONT_KEY_PAIR_ID` | CloudFront key pair (public key in ACM/CloudFront) |
+| `CLOUDFRONT_PRIVATE_KEY_PATH` | Path to PEM private key on API host (never commit) |
+
+### CloudFront playback (S6-05 — manual console setup)
+
+Terraform does not create the distribution yet. For signed playback:
+
+1. Create a **CloudFront distribution** with origin = your media S3 bucket.
+2. Use **Origin Access Control (OAC)** so the bucket stays private (no public object URLs).
+3. Create a **CloudFront key group** / trusted key for signed URLs; save the PEM private key locally.
+4. Set `CLOUDFRONT_DOMAIN` (e.g. `d111111abcdef8.cloudfront.net`), `CLOUDFRONT_KEY_PAIR_ID`, and `CLOUDFRONT_PRIVATE_KEY_PATH` in `.env`.
+5. Without these vars, playback falls back to **S3 presigned** URLs (still private; not public bucket).
 
 ## IAM notes
 

@@ -102,7 +102,9 @@ In-app notifications (`notifications` table) for assignment, invite, completion,
 
 Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: local disk** (`STORAGE_PROVIDER=local`, `STORAGE_LOCAL_ROOT=.data/media` under the monorepo root — API and worker share the same path).
 
-**AWS S3:** set `STORAGE_PROVIDER=s3` with `S3_BUCKET` and `AWS_REGION` (from `infra/terraform` outputs; see `infra/terraform/README.md`). Uploads use `PutObject`; playback returns an S3 presigned GET URL until CloudFront (S6-05). The worker still uses local disk until S6-03.
+**AWS S3:** set `STORAGE_PROVIDER=s3` with `S3_BUCKET` and `AWS_REGION` (from `infra/terraform` outputs; see `infra/terraform/README.md`). Uploads use `PutObject`; playback uses S3 presigned GET unless CloudFront is configured (S6-05).
+
+**CloudFront playback (optional):** set `CLOUDFRONT_DOMAIN`, `CLOUDFRONT_KEY_PAIR_ID`, and `CLOUDFRONT_PRIVATE_KEY_PATH` for signed CDN URLs (distribution must use OAC to the private bucket — see `infra/terraform/README.md`). Without CloudFront vars, playback falls back to S3 presigned or local `file://` URLs.
 
 ### Video upload + Kafka + worker
 
@@ -110,7 +112,7 @@ Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: l
 
 `npm run worker:dev` runs the consumer: it updates the same Postgres (`DATABASE_URL`) via `@academistream/db`, sets `processing`, then either **submits MediaConvert** (`STORAGE_PROVIDER=s3`) and stores `mediaconvert_job_id`, or **local stub** checks the file exists and sets `ready` + `playback_key`. A worker **poll loop** (`GetJob`, default every 15s) marks AWS jobs `ready` with the transcoded `playback_key` or `failed`. Completion via SNS is a future scale path.
 
-`GET /videos/:id/playback` returns a short-lived URL (`{ url, expiresIn }`) for `ready` videos in the caller’s tenant — local `file://` or S3 presigned depending on `STORAGE_PROVIDER`. Learners may only play `published` content; admin/instructor can play drafts too. Cross-tenant and not-ready → 4xx. CloudFront signed URLs land in S6-05.
+`GET /videos/:id/playback` returns a short-lived URL (`{ url, expiresIn: 3600 }`) for `ready` videos — local `file://`, S3 presigned, or **CloudFront signed** when `CLOUDFRONT_*` env vars are set. Uses `playbackKey` when present (transcoded output). Learners may only play `published` content; admin/instructor can play drafts. Cross-tenant and not-ready → 4xx.
 
 ## Environments
 

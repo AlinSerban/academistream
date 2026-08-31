@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuditService } from '../audit/audit.service';
 import { DRIZZLE } from '../db/db.module';
 import { STORAGE } from '../storage/storage.module';
+import { PlaybackUrlService } from '../storage/playback-url.service';
 import { KafkaProducerService } from '../kafka/kafka.producer';
 import { QuotasService } from '../quotas/quotas.service';
 import { VideosService } from './videos.service';
@@ -13,7 +14,8 @@ describe('VideosService', () => {
     select: jest.Mock;
     insert: jest.Mock;
   };
-  let storage: { getSignedGetUrl: jest.Mock; putObject: jest.Mock };
+  let storage: { putObject: jest.Mock };
+  let playbackUrls: { getSignedGetUrl: jest.Mock };
   let kafka: { sendVideoProcessingJob: jest.Mock };
   let audit: { record: jest.Mock };
   let quotas: { assertCanAddVideo: jest.Mock };
@@ -24,8 +26,10 @@ describe('VideosService', () => {
       insert: jest.fn(),
     };
     storage = {
-      getSignedGetUrl: jest.fn(),
       putObject: jest.fn(),
+    };
+    playbackUrls = {
+      getSignedGetUrl: jest.fn(),
     };
     kafka = {
       sendVideoProcessingJob: jest.fn(),
@@ -38,6 +42,7 @@ describe('VideosService', () => {
         VideosService,
         { provide: DRIZZLE, useValue: db },
         { provide: STORAGE, useValue: storage },
+        { provide: PlaybackUrlService, useValue: playbackUrls },
         { provide: KafkaProducerService, useValue: kafka },
         { provide: AuditService, useValue: audit },
         { provide: QuotasService, useValue: quotas },
@@ -122,13 +127,13 @@ describe('VideosService', () => {
 
   it('getPlaybackUrl succeeds for ready published video', async () => {
     mockSelectLimit([readyPublished]);
-    storage.getSignedGetUrl.mockResolvedValue('file:///tmp/video.mp4');
+    playbackUrls.getSignedGetUrl.mockResolvedValue('file:///tmp/video.mp4');
 
     await expect(
       service.getPlaybackUrl(3, 10, 'learner'),
     ).resolves.toEqual({ url: 'file:///tmp/video.mp4', expiresIn: 3600 });
 
-    expect(storage.getSignedGetUrl).toHaveBeenCalledWith(
+    expect(playbackUrls.getSignedGetUrl).toHaveBeenCalledWith(
       readyPublished.storageKey,
     );
   });
@@ -139,7 +144,7 @@ describe('VideosService', () => {
     await expect(
       service.getPlaybackUrl(3, 20, 'tenant_admin'),
     ).rejects.toThrow(NotFoundException);
-    expect(storage.getSignedGetUrl).not.toHaveBeenCalled();
+    expect(playbackUrls.getSignedGetUrl).not.toHaveBeenCalled();
   });
 
   it('getPlaybackUrl throws NotFound when media not ready', async () => {
@@ -150,7 +155,7 @@ describe('VideosService', () => {
     await expect(
       service.getPlaybackUrl(3, 10, 'tenant_admin'),
     ).rejects.toThrow(NotFoundException);
-    expect(storage.getSignedGetUrl).not.toHaveBeenCalled();
+    expect(playbackUrls.getSignedGetUrl).not.toHaveBeenCalled();
   });
 
   it('getPlaybackUrl forbids learner on draft', async () => {
@@ -161,14 +166,14 @@ describe('VideosService', () => {
     await expect(
       service.getPlaybackUrl(3, 10, 'learner'),
     ).rejects.toThrow(ForbiddenException);
-    expect(storage.getSignedGetUrl).not.toHaveBeenCalled();
+    expect(playbackUrls.getSignedGetUrl).not.toHaveBeenCalled();
   });
 
   it('getPlaybackUrl allows instructor on draft ready', async () => {
     mockSelectLimit([
       { ...readyPublished, publishState: 'draft' },
     ]);
-    storage.getSignedGetUrl.mockResolvedValue('file:///tmp/draft.mp4');
+    playbackUrls.getSignedGetUrl.mockResolvedValue('file:///tmp/draft.mp4');
 
     await expect(
       service.getPlaybackUrl(3, 10, 'instructor'),

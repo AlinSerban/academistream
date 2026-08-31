@@ -6,6 +6,7 @@ import type { CreateVideoInput, PublishState, UpdateVideoInput } from "./types";
 import { eq, and } from 'drizzle-orm';
 import type { StorageService } from "../storage/storage.types";
 import { STORAGE } from "../storage/storage.module";
+import { PlaybackUrlService } from "../storage/playback-url.service";
 import { KafkaProducerService } from "../kafka/kafka.producer";
 import { AuditService } from "../audit/audit.service";
 import { QuotasService } from "../quotas/quotas.service";
@@ -15,6 +16,7 @@ export class VideosService {
     constructor(
         @Inject(DRIZZLE) private readonly db: Db,
         @Inject(STORAGE) private readonly storage: StorageService,
+        private readonly playbackUrls: PlaybackUrlService,
         private readonly kafka: KafkaProducerService,
         private readonly audit: AuditService,
         private readonly quotas: QuotasService,
@@ -148,7 +150,7 @@ export class VideosService {
         if (role === 'learner' && video.publishState !== 'published')
             throw new ForbiddenException();
 
-        const url = await this.storage.getSignedGetUrl(playbackKey);
+        const url = await this.playbackUrls.getSignedGetUrl(playbackKey);
 
         return { url, expiresIn: 3600 };
     }
