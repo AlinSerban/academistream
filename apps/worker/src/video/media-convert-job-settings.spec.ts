@@ -8,12 +8,12 @@ describe('buildMediaConvertJobSettings', () => {
             'tenants/10/videos/3/output',
         );
 
-        expect(settings.Inputs[0].FileInput).toBe(
+        expect(settings.Inputs?.[0]?.FileInput).toBe(
             's3://test-bucket/tenants/10/videos/3/source.mp4',
         );
-        expect(settings.OutputGroups[0].OutputGroupSettings.FileGroupSettings.Destination).toBe(
-            's3://test-bucket/tenants/10/videos/3/output/',
-        );
-        expect(settings.OutputGroups[0].Outputs[0].ContainerSettings.Container).toBe('MP4');
+        expect(
+            settings.OutputGroups?.[0]?.OutputGroupSettings?.FileGroupSettings?.Destination,
+        ).toBe('s3://test-bucket/tenants/10/videos/3/output/');
+        expect(settings.OutputGroups?.[0]?.Outputs?.[0]?.ContainerSettings?.Container).toBe('MP4');
     });
 });

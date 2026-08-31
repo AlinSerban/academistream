@@ -1,9 +1,11 @@
+import type { JobSettings } from '@aws-sdk/client-mediaconvert';
+
 /** MediaConvert job settings: one MP4 output under the given S3 prefix (no bucket in prefix). */
 export function buildMediaConvertJobSettings(
     bucket: string,
     inputKey: string,
     outputPrefix: string,
-) {
+): JobSettings {
     const normalizedPrefix = outputPrefix.endsWith('/') ? outputPrefix : `${outputPrefix}/`;
 
     return {
@@ -28,10 +30,6 @@ export function buildMediaConvertJobSettings(
                     },
                 },
                 AudioDescriptions: [{
-                    AudioSourceSettings: {
-                        SourceType: 'TRACK',
-                        TrackNumber: 1,
-                    },
                     CodecSettings: {
                         Codec: 'AAC',
                         AacSettings: {

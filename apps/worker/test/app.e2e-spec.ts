@@ -8,12 +8,7 @@ describe('Worker AppModule (e2e)', () => {
       imports: [AppModule],
     }).compile();
 
-    const context = moduleFixture.createNestApplicationContext();
-    await context.init();
-
-    const service = context.get(AppService);
+    const service = moduleFixture.get(AppService);
     expect(service.getHello()).toBe('Hello World!');
-
-    await context.close();
   });
 });

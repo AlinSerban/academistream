@@ -54,6 +54,10 @@ export class VideoProcessingService {
     }
 
     private async submitMediaConvertJob(job: VideoProcessingJob): Promise<void> {
+        if (this.processingMode.kind !== 'mediaconvert') {
+            throw new Error('MediaConvert is not configured');
+        }
+
         const outputPrefix = `tenants/${job.tenantId}/videos/${job.videoId}/output`;
         const mediaConvertJobId = await this.processingMode.mediaConvert.submitTranscodeJob(
             job.storageKey,
