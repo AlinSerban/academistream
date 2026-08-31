@@ -98,9 +98,11 @@ In-app notifications (`notifications` table) for assignment, invite, completion,
 
 **Web demo:** `/notifications` inbox; `/org` shows quota usage for tenant admins (instructors see quotas too). Trigger notifications by assigning training, inviting a user, completing a video, or failing worker processing. Platform admin can lower limits via API: `PATCH /tenants/:id/quotas` with `{ "maxUsers": 5, "maxVideos": 2 }`.
 
-### Media storage
+### Media storage (S6-01 baseline)
 
-Object bytes go through a storage adapter (`apps/api/src/storage`). **Local disk** is active (`STORAGE_LOCAL_ROOT`, default `.data/media` under the **monorepo root** — both API and worker resolve relative paths from the repo root so they share the same files). S3 is documented as commented SDK-shaped code next to the local methods; set `S3_BUCKET` / `AWS_REGION` in `.env` only when you switch the provider later — they are unused today.
+Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: local disk** (`STORAGE_PROVIDER=local`, `STORAGE_LOCAL_ROOT=.data/media` under the monorepo root — API and worker share the same path).
+
+**AWS media** (S3 + MediaConvert role) is provisioned with Terraform under `infra/terraform/` (S6-01). The app still uses the local adapter until S6-02 wires S3; see `infra/terraform/README.md` for `terraform output` → `.env` mapping (`S3_BUCKET`, `MEDIACONVERT_ROLE`, `AWS_REGION`). CloudFront playback vars are placeholders until S6-05.
 
 ### Video upload + Kafka + worker
 
