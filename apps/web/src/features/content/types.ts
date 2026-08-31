@@ -15,6 +15,7 @@ export interface Video {
   courseId: number
   title: string
   storageKey: string | null
+  playbackKey: string | null
   publishState: PublishState
   mediaStatus: MediaStatus
   createdAt: string

@@ -5,6 +5,7 @@ import { DbModule } from './db/db.module';
 import { KafkaConsumerService } from './kafka/kafka.consumer';
 import { NotificationsModule } from './notifications/notifications.module';
 import { VideoProcessingService } from './video/video-processing.service';
+import { MediaConvertCompletionPoller } from './video/media-convert-completion.poller';
 
 @Module({
   imports: [
@@ -15,6 +16,11 @@ import { VideoProcessingService } from './video/video-processing.service';
     DbModule,
     NotificationsModule,
   ],
-  providers: [AppService, VideoProcessingService, KafkaConsumerService],
+  providers: [
+    AppService,
+    VideoProcessingService,
+    KafkaConsumerService,
+    MediaConvertCompletionPoller,
+  ],
 })
 export class AppModule {}

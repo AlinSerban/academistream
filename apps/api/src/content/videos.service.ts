@@ -138,13 +138,17 @@ export class VideosService {
 
     async getPlaybackUrl(videoId: number, tenantId: number, role: string) {
         const video = await this.getVideoById(videoId, tenantId);
-        if (video.mediaStatus !== 'ready' || video.storageKey == null)
+        if (video.mediaStatus !== 'ready')
+            throw new NotFoundException();
+
+        const playbackKey = video.playbackKey ?? video.storageKey;
+        if (playbackKey == null)
             throw new NotFoundException();
 
         if (role === 'learner' && video.publishState !== 'published')
             throw new ForbiddenException();
 
-        const url = await this.storage.getSignedGetUrl(video.storageKey);
+        const url = await this.storage.getSignedGetUrl(playbackKey);
 
         return { url, expiresIn: 3600 };
     }

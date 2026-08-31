@@ -1,0 +1,1 @@
+ALTER TABLE "videos" ADD COLUMN "playback_key" varchar(512);

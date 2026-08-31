@@ -45,7 +45,7 @@ export class VideoProcessingService {
             }
 
             await access(path.join(this.rootDir, job.storageKey));
-            await this.setStatus(job, 'ready');
+            await this.markReady(job, job.storageKey);
         }
         catch {
             await this.setStatus(job, 'failed');
@@ -96,6 +96,16 @@ export class VideoProcessingService {
             .from(videos)
             .where(and(eq(videos.id, videoId), eq(videos.tenantId, tenantId)))
             .limit(1);
+    }
+
+    private async markReady(job: VideoProcessingJob, playbackKey: string) {
+        return await this.db.update(videos)
+            .set({
+                mediaStatus: 'ready',
+                playbackKey,
+                updatedAt: new Date(),
+            })
+            .where(and(eq(videos.id, job.videoId), eq(videos.tenantId, job.tenantId)));
     }
 
     private async setStatus(job: VideoProcessingJob, status: 'processing' | 'ready' | 'failed') {

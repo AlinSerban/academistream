@@ -108,7 +108,7 @@ Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: l
 
 `POST /videos/:id/upload` accepts multipart field `file`, writes via the storage adapter, sets `mediaStatus` to `queued`, then produces a job to Kafka topic `video.processing` (`KAFKA_VIDEO_TOPIC`; brokers `KAFKA_BROKERS=localhost:29092`). Payload: `{ videoId, tenantId, storageKey }`.
 
-`npm run worker:dev` runs the consumer: it updates the same Postgres (`DATABASE_URL`) via `@academistream/db`, sets `processing`, then either **submits MediaConvert** (`STORAGE_PROVIDER=s3`) and stores `mediaconvert_job_id`, or **local stub** checks the file exists and sets `ready` / `failed`. Completion after MediaConvert is **S6-04**.
+`npm run worker:dev` runs the consumer: it updates the same Postgres (`DATABASE_URL`) via `@academistream/db`, sets `processing`, then either **submits MediaConvert** (`STORAGE_PROVIDER=s3`) and stores `mediaconvert_job_id`, or **local stub** checks the file exists and sets `ready` + `playback_key`. A worker **poll loop** (`GetJob`, default every 15s) marks AWS jobs `ready` with the transcoded `playback_key` or `failed`. Completion via SNS is a future scale path.
 
 `GET /videos/:id/playback` returns a short-lived URL (`{ url, expiresIn }`) for `ready` videos in the caller’s tenant — local `file://` or S3 presigned depending on `STORAGE_PROVIDER`. Learners may only play `published` content; admin/instructor can play drafts too. Cross-tenant and not-ready → 4xx. CloudFront signed URLs land in S6-05.
 

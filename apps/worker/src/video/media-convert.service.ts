@@ -1,9 +1,14 @@
 import {
     CreateJobCommand,
+    GetJobCommand,
+    type Job,
     MediaConvertClient,
 } from '@aws-sdk/client-mediaconvert';
 import { mediaConvertRegionalEndpoint } from './media-convert-endpoint';
 import { buildMediaConvertJobSettings } from './media-convert-job-settings';
+import { parsePlaybackKeyFromJob } from './parse-playback-key';
+
+export type MediaConvertJobState = 'SUBMITTED' | 'PROGRESSING' | 'COMPLETE' | 'CANCELED' | 'ERROR';
 
 export class MediaConvertService {
     private client: MediaConvertClient | null = null;
@@ -30,6 +35,25 @@ export class MediaConvertService {
         }
 
         return jobId;
+    }
+
+    async getJob(jobId: string): Promise<Job | undefined> {
+        const client = await this.getClient();
+        const result = await client.send(new GetJobCommand({ Id: jobId }));
+        return result.Job;
+    }
+
+    async getJobState(jobId: string): Promise<MediaConvertJobState | undefined> {
+        const job = await this.getJob(jobId);
+        return job?.Status as MediaConvertJobState | undefined;
+    }
+
+    async getPlaybackKeyForJob(jobId: string): Promise<string | null> {
+        const job = await this.getJob(jobId);
+        if (!job) {
+            return null;
+        }
+        return parsePlaybackKeyFromJob(job, this.bucket);
     }
 
     private async getClient(): Promise<MediaConvertClient> {
