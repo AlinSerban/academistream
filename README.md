@@ -2,8 +2,6 @@
 
 B2B private training-video platform. Customer companies get their own org, users, and private videos.
 
-**Backlog:** [Trello — Academistream](https://trello.com/b/NjB5lBuC/academistream)
-
 ## Apps
 
 | Path | Package | Role |
@@ -47,7 +45,7 @@ Sample check: `GET /tenants/me` returns `{ id, name, status }` for the caller's 
 
 ### Testing strategy (API)
 
-Sprint 1 security tests are **unit tests with Jest mocks** — no real Postgres, Redis, or Kafka in CI.
+Auth and isolation tests are **unit tests with Jest mocks** — no real Postgres, Redis, or Kafka in CI.
 
 | Area | Approach |
 |------|----------|
@@ -56,7 +54,7 @@ Sprint 1 security tests are **unit tests with Jest mocks** — no real Postgres,
 | RolesGuard | Instantiate guard with mocked `Reflector`; fake `ExecutionContext` + JWT payload |
 | Tenant isolation | Controller uses JWT `roles[].tenantId` (Acme ≠ Globex); service `getMe(tenantId)` with mocked Drizzle |
 
-Run: `npm test -w @academistream/api` (also in CI). A transactional test DB / Supertest e2e layer is out of scope for S1-08; add later if integration coverage is needed.
+Run: `npm test -w @academistream/api` (also in CI). Integration / Supertest against a real database is a documented next step, not required for current CI.
 
 Seed is idempotent (re-run skips existing emails/tenants). Dev accounts (password from `SEED_PASSWORD` in `.env`, default `Password123!`):
 
@@ -77,19 +75,19 @@ npm run web:dev
 - API health: http://localhost:3000/health  
 - Web: http://localhost:5173  
 
-Web login (S1-09): Vite proxies `/api` → API (`localhost:3000`). Access token stays in Redux memory; refresh uses the HttpOnly cookie (`credentials: 'include'`). Seed users: see Tenancy section above.
+**Web auth:** Vite proxies `/api` → API (`localhost:3000`). Access token stays in Redux memory; refresh uses the HttpOnly cookie (`credentials: 'include'`). Seed users: see Tenancy section above.
 
-After login, `/` is the thin content library (S2-08): list courses/videos, create+upload a file, poll `mediaStatus`, and fetch a playback URL when `ready`. Profile is at `/me`. Use a tenant admin or instructor (learners cannot list/upload).
+After login, staff land on the **content library** (`/`): list courses/videos, create+upload a file, poll `mediaStatus`, and fetch a playback URL when `ready`. Learners are directed to **My training** (`/training`). Profile is at `/me`. Use a tenant admin or instructor for library upload (learners cannot list/upload).
 
-`/training` (S3): assign published ready videos to learners; learners report watch `%` (completion at ≥ 90%); admins see tenant progress/completions. Assignment target is **video** (not course).
+`/training`: staff assign published ready videos to learners; learners watch, report watch `%` (completion at ≥ 90%), and mark complete; admins see tenant progress/completions. Assignment target is **video** (not course).
 
-`/org` (S4): tenant admin invites (raw token shown once; 7-day expiry; no SES), members list/remove (cannot remove last `tenant_admin`), completions CSV download, and audit event list. Instructors can list audit events. Public `/accept-invite` accepts a token (+ name/password for new users).
+`/org`: tenant admin invites (raw token shown once; 7-day expiry; local mailer, not SES), members list/remove (cannot remove last `tenant_admin`), completions CSV download, and audit event list. Instructors can list audit events. Public `/accept-invite` accepts a token (+ name/password for new users).
 
-**Audit actions (best-effort, never blocks the primary write):** `assignment.created`, `completion.created`, `video.published`, `invite.created`, `invite.accepted`, `invite.revoked`, `membership.removed`. Login success is not audited in this sprint.
+**Audit actions (best-effort, never blocks the primary write):** `assignment.created`, `completion.created`, `video.published`, `invite.created`, `invite.accepted`, `invite.revoked`, `membership.removed`. Login success is not audited in v1.
 
-### Notifications & quotas (S5)
+### Notifications & quotas
 
-In-app notifications (`notifications` table) for assignment, invite, completion, and media-failure events. Email uses a local/console mail stub (commented SES shape in `apps/api/src/mail`).
+In-app notifications (`notifications` table) for assignment, invite, completion, and media-failure events. Email uses a local/console mailer (`apps/api/src/mail`); swap in SES behind the same `MAIL` adapter when you verify a domain.
 
 - `GET /notifications` — current user's inbox (JWT tenant + user); `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`
 - `GET /quotas/usage` — tenant admin/instructor: limits (`maxUsers`, `maxVideos`; **null = unlimited**) vs current member/video counts
@@ -98,11 +96,11 @@ In-app notifications (`notifications` table) for assignment, invite, completion,
 
 **Web demo:** `/notifications` inbox; `/org` shows quota usage for tenant admins (instructors see quotas too). Trigger notifications by assigning training, inviting a user, completing a video, or failing worker processing. Platform admin can lower limits via API: `PATCH /tenants/:id/quotas` with `{ "maxUsers": 5, "maxVideos": 2 }`.
 
-### Media storage (S6-01 / S6-02)
+### Media storage
 
 Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: local disk** (`STORAGE_PROVIDER=local`, `STORAGE_LOCAL_ROOT=.data/media` under the monorepo root — API and worker share the same path).
 
-**AWS S3:** set `STORAGE_PROVIDER=s3` with `S3_BUCKET` and `AWS_REGION` (from `infra/terraform` outputs; see `infra/terraform/README.md`). Uploads use `PutObject`; playback uses S3 presigned GET unless CloudFront is configured (S6-05).
+**AWS S3:** set `STORAGE_PROVIDER=s3` with `S3_BUCKET` and `AWS_REGION` (from `infra/terraform` outputs; see `infra/terraform/README.md`). Uploads use `PutObject`; playback uses S3 presigned GET unless CloudFront is configured.
 
 **CloudFront playback (optional):** set `CLOUDFRONT_DOMAIN`, `CLOUDFRONT_KEY_PAIR_ID`, and `CLOUDFRONT_PRIVATE_KEY_PATH` for signed CDN URLs (distribution must use OAC to the private bucket — see `infra/terraform/README.md`). Without CloudFront vars, playback falls back to S3 presigned or local `file://` URLs.
 
@@ -110,13 +108,13 @@ Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: l
 
 `POST /videos/:id/upload` accepts multipart field `file`, writes via the storage adapter, sets `mediaStatus` to `queued`, then produces a job to Kafka topic `video.processing` (`KAFKA_VIDEO_TOPIC`; brokers `KAFKA_BROKERS=localhost:29092`). Payload: `{ videoId, tenantId, storageKey }`.
 
-`npm run worker:dev` runs the consumer: it updates the same Postgres (`DATABASE_URL`) via `@academistream/db`, sets `processing`, then either **submits MediaConvert** (`STORAGE_PROVIDER=s3`) and stores `mediaconvert_job_id`, or **local stub** checks the file exists and sets `ready` + `playback_key`. A worker **poll loop** (`GetJob`, default every 15s) marks AWS jobs `ready` with the transcoded `playback_key` or `failed`. Completion via SNS is a future scale path.
+`npm run worker:dev` runs the consumer: it updates the same Postgres (`DATABASE_URL`) via `@academistream/db`, sets `processing`, then either **submits MediaConvert** (`STORAGE_PROVIDER=s3`) and stores `mediaconvert_job_id`, or on **local disk** checks the file exists and sets `ready` + `playback_key`. A worker **poll loop** (`GetJob`, default every 15s) marks AWS jobs `ready` with the transcoded `playback_key` or `failed`. SNS/EventBridge completion is the documented scale path (see `docs/engineering/SCALE_PATH.md`).
 
 `GET /videos/:id/playback` returns a short-lived URL (`{ url, expiresIn: 3600 }`) for `ready` videos — local `file://`, S3 presigned, or **CloudFront signed** when `CLOUDFRONT_*` env vars are set. Uses `playbackKey` when present (transcoded output). Learners may only play `published` content; admin/instructor can play drafts. Cross-tenant and not-ready → 4xx.
 
 The library page (`/`) polls video list every **2 seconds** while any video is `queued` or `processing`, then stops when all are `ready` or `failed`. Click **Play** on a ready video to fetch the signed URL; HTTPS URLs (S3/CloudFront) play inline in `<video>`; local `file://` URLs show a path hint only (browser security).
 
-### Demo: local vs AWS (S6-07)
+### Demo: local vs AWS
 
 #### Local path (default — dev / CI)
 
@@ -125,7 +123,7 @@ The library page (`/`) polls video list every **2 seconds** while any video is `
 3. Run API, worker, and web (`npm run api:dev`, `npm run worker:dev`, `npm run web:dev`).
 4. Sign in as `instructor@acme.local`, open `/`, create course + upload a small MP4.
 5. **Status flow:** `queued` → `processing` (brief) → `ready` (worker checks file on disk under `.data/media`).
-6. Publish the video (API or future UI), then **Play** — playback URL is `file://` (not inline in browser; path shown on page).
+6. Publish the video (API), then **Play** — playback URL is `file://` (not inline in browser; path shown on page).
 
 #### AWS path (S3 + MediaConvert + optional CloudFront)
 

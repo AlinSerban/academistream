@@ -1,4 +1,5 @@
 import {
+    CancelJobCommand,
     CreateJobCommand,
     GetJobCommand,
     type Job,
@@ -10,6 +11,24 @@ import { parsePlaybackKeyFromJob } from './parse-playback-key';
 
 export type MediaConvertJobState = 'SUBMITTED' | 'PROGRESSING' | 'COMPLETE' | 'CANCELED' | 'ERROR';
 
+/** Human-readable failure reason from a GetJob response (for logs). */
+export function formatMediaConvertJobFailure(job: Job): string {
+    const state = job.Status ?? 'UNKNOWN';
+    const code = job.ErrorCode;
+    const message = job.ErrorMessage?.trim();
+
+    if (code != null && message) {
+        return `MediaConvert job ${state} (${code}): ${message}`;
+    }
+    if (message) {
+        return `MediaConvert job ${state}: ${message}`;
+    }
+    if (code != null) {
+        return `MediaConvert job ${state} (${code})`;
+    }
+    return `MediaConvert job ${state}`;
+}
+
 export class MediaConvertService {
     private client: MediaConvertClient | null = null;
 
@@ -18,7 +37,7 @@ export class MediaConvertService {
         private readonly roleArn: string,
         private readonly bucket: string,
         private readonly clientOverride?: MediaConvertClient,
-    ) {}
+    ) { }
 
     async submitTranscodeJob(inputKey: string, outputPrefix: string): Promise<string> {
         const client = await this.getClient();
@@ -48,12 +67,25 @@ export class MediaConvertService {
         return job?.Status as MediaConvertJobState | undefined;
     }
 
+    getPlaybackKeyFromJob(job: Job): string | null {
+        return parsePlaybackKeyFromJob(job, this.bucket);
+    }
+
     async getPlaybackKeyForJob(jobId: string): Promise<string | null> {
         const job = await this.getJob(jobId);
         if (!job) {
             return null;
         }
-        return parsePlaybackKeyFromJob(job, this.bucket);
+        return this.getPlaybackKeyFromJob(job);
+    }
+
+    async cancelJob(jobId: string): Promise<void> {
+        if (!jobId)
+            throw new Error('There is no job to cancel');
+
+        const client = await this.getClient();
+        await client.send(new CancelJobCommand({ Id: jobId }))
+
     }
 
     private async getClient(): Promise<MediaConvertClient> {

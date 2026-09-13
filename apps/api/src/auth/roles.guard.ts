@@ -14,12 +14,13 @@ export class RolesGuard implements CanActivate {
         ]);
         if (!required || required.length === 0) return true;
 
-        const user = context.switchToHttp().getRequest().user as JwtPayload;
+        const user = context.switchToHttp().getRequest().user as JwtPayload | undefined;
+        if (!user) throw new ForbiddenException();
 
-        if (required.includes('platform_admin'))
-            if (user.isPlatformAdmin) return true;
+        if (required.includes('platform_admin') && user.isPlatformAdmin) return true;
 
-        const hasRole = user.roles.some((m) => required.includes(m.role));
+        const roles = user.roles ?? [];
+        const hasRole = roles.some((m) => required.includes(m.role));
         if (!hasRole) throw new ForbiddenException();
         return true;
     }

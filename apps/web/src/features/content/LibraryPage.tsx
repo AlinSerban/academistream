@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import type { SerializedError } from '@reduxjs/toolkit'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
-import { useLogoutMutation, useMeQuery } from '../auth/authApi'
+import { MediaStatusBadge } from '../../components/MediaStatusBadge'
+import { PageHeader } from '../../components/PageHeader'
+import {
+  PaginationControls,
+  slicePage,
+} from '../../components/PaginationControls'
+import { useMeQuery } from '../auth/authApi'
 import {
   useCreateCourseMutation,
   useCreateVideoMutation,
@@ -13,22 +19,20 @@ import {
 } from './contentApi'
 import type { Video } from './types'
 
+const COURSE_PAGE_SIZE = 5
+const VIDEO_PAGE_SIZE = 5
+
 export function LibraryPage() {
-  const navigate = useNavigate()
   const { data: me } = useMeQuery()
-  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation()
-
-  async function onLogout() {
-    await logout()
-    navigate('/login', { replace: true })
-  }
-
+  const isLearner = me?.memberships[0]?.role === 'learner'
   const {
     data: courses = [],
     isLoading: coursesLoading,
     isError: coursesError,
     error: coursesErr,
-  } = useGetCoursesQuery()
+  } = useGetCoursesQuery(undefined, {
+    skip: me == null || isLearner,
+  })
 
   const [pollMs, setPollMs] = useState(0)
   const {
@@ -36,14 +40,18 @@ export function LibraryPage() {
     isLoading: videosLoading,
     isError: videosError,
     error: videosErr,
-  } = useGetVideosQuery(undefined, { pollingInterval: pollMs })
+  } = useGetVideosQuery(undefined, {
+    pollingInterval: pollMs,
+    skip: me == null || isLearner,
+  })
+
+  const mediaBusy = videos.some(
+    (v) => v.mediaStatus === 'queued' || v.mediaStatus === 'processing',
+  )
 
   useEffect(() => {
-    const busy = videos.some(
-      (v) => v.mediaStatus === 'queued' || v.mediaStatus === 'processing',
-    )
-    setPollMs(busy ? 2000 : 0)
-  }, [videos])
+    setPollMs(mediaBusy ? 2000 : 0)
+  }, [mediaBusy])
 
   const courseTitleById = useMemo(() => {
     const map = new Map<number, string>()
@@ -52,11 +60,15 @@ export function LibraryPage() {
   }, [courses])
 
   const [courseTitle, setCourseTitle] = useState('')
+  const [courseQuery, setCourseQuery] = useState('')
+  const [coursePage, setCoursePage] = useState(1)
   const [createCourse, createCourseState] = useCreateCourseMutation()
 
   const [videoTitle, setVideoTitle] = useState('')
   const [courseId, setCourseId] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [videoStatusFilter, setVideoStatusFilter] = useState('all')
+  const [videoPage, setVideoPage] = useState(1)
   const [createVideo, createVideoState] = useCreateVideoMutation()
   const [uploadVideo, uploadVideoState] = useUploadVideoMutation()
   const [uploadMessage, setUploadMessage] = useState<string | null>(null)
@@ -66,6 +78,35 @@ export function LibraryPage() {
     Record<number, string>
   >({})
 
+  const filteredCourses = useMemo(() => {
+    const q = courseQuery.trim().toLowerCase()
+    const list = !q
+      ? courses
+      : courses.filter(
+          (c) => c.title.toLowerCase().includes(q) || String(c.id).includes(q),
+        )
+    return [...list].sort((a, b) => b.id - a.id)
+  }, [courses, courseQuery])
+
+  const filteredVideos = useMemo(() => {
+    const list =
+      videoStatusFilter === 'all'
+        ? videos
+        : videos.filter((v) => v.mediaStatus === videoStatusFilter)
+    return [...list].sort((a, b) => b.id - a.id)
+  }, [videos, videoStatusFilter])
+
+  useEffect(() => {
+    setCoursePage(1)
+  }, [courseQuery, courses.length])
+
+  useEffect(() => {
+    setVideoPage(1)
+  }, [videoStatusFilter, videos.length])
+
+  const pagedCourses = slicePage(filteredCourses, coursePage, COURSE_PAGE_SIZE)
+  const pagedVideos = slicePage(filteredVideos, videoPage, VIDEO_PAGE_SIZE)
+
   async function onCreateCourse(event: FormEvent) {
     event.preventDefault()
     const title = courseTitle.trim()
@@ -73,6 +114,8 @@ export function LibraryPage() {
     try {
       await createCourse({ title }).unwrap()
       setCourseTitle('')
+      setCourseQuery('')
+      setCoursePage(1)
     } catch {
       // mutation error shown below
     }
@@ -95,7 +138,7 @@ export function LibraryPage() {
       await uploadVideo({ videoId: video.id, file }).unwrap()
       setVideoTitle('')
       setFile(null)
-      setUploadMessage(`Uploaded video #${video.id} — waiting for processing…`)
+      setUploadMessage(`Uploaded “${video.title}” — waiting for processing…`)
       setPollMs(2000)
     } catch {
       setUploadMessage('Create or upload failed.')
@@ -111,204 +154,290 @@ export function LibraryPage() {
     }
   }
 
-  return (
-    <main className="mx-auto max-w-2xl px-4 py-10 text-left">
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Library</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {me ? `Signed in as ${me.email}` : 'Content for your tenant'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/training"
-          >
-            Training
-          </Link>
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/notifications"
-          >
-            Notifications
-          </Link>
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/org"
-          >
-            Org
-          </Link>
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/me"
-          >
-            Profile
-          </Link>
-          <button
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50 disabled:opacity-60"
-            type="button"
-            disabled={isLoggingOut}
-            onClick={() => void onLogout()}
-          >
-            {isLoggingOut ? 'Signing out…' : 'Log out'}
-          </button>
-        </div>
-      </div>
+  const expandedVideoId =
+    playbackState.originalArgs ??
+    (Object.keys(playbackByVideoId).length > 0
+      ? Number(Object.keys(playbackByVideoId).at(-1))
+      : null)
 
-      <section className="mb-10">
-        <h2 className="mb-3 text-lg font-medium text-slate-900">Courses</h2>
+  if (isLearner) {
+    return <Navigate to="/training" replace />
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Content library"
+        subtitle={me ? `Courses and videos · ${me.email}` : 'Courses and videos'}
+      />
+
+      <section className="panel">
+        <header className="panel-head">
+          <h2 className="panel-title">Courses</h2>
+          {!coursesLoading && !coursesError && courses.length > 0 ? (
+            <span className="panel-count">
+              {courseQuery.trim()
+                ? `${filteredCourses.length} of ${courses.length}`
+                : `${courses.length} ${courses.length === 1 ? 'course' : 'courses'}`}
+            </span>
+          ) : null}
+        </header>
+
         {coursesLoading ? (
-          <p className="text-sm text-slate-600">Loading courses…</p>
+          <p className="panel-empty">Loading courses…</p>
         ) : coursesError ? (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="alert-error panel-empty" role="alert">
             {getListErrorMessage(coursesErr)}
           </p>
         ) : courses.length === 0 ? (
-          <p className="text-sm text-slate-600">No courses yet.</p>
+          <p className="panel-empty">No courses yet. Create one below.</p>
         ) : (
-          <ul className="mb-4 list-inside list-disc space-y-1 text-sm text-slate-900">
-            {courses.map((c) => (
-              <li key={c.id}>
-                #{c.id} — {c.title}
-              </li>
-            ))}
-          </ul>
+          <>
+            <table className="data-table data-table-zebra">
+              <thead>
+                <tr>
+                  <th className="col-id">ID</th>
+                  <th>Course</th>
+                  <th className="col-search">
+                    <label className="sr-only" htmlFor="course-search">
+                      Search courses
+                    </label>
+                    <input
+                      id="course-search"
+                      className="input"
+                      type="search"
+                      placeholder="Search…"
+                      value={courseQuery}
+                      onChange={(e) => setCourseQuery(e.target.value)}
+                    />
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCourses.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="cell-secondary">
+                      No courses match that search.
+                    </td>
+                  </tr>
+                ) : (
+                  pagedCourses.map((c) => (
+                    <tr key={c.id}>
+                      <td className="col-id cell-id">{c.id}</td>
+                      <td className="cell-primary">{c.title}</td>
+                      <td aria-hidden="true" />
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+
+            <PaginationControls
+              page={coursePage}
+              pageSize={COURSE_PAGE_SIZE}
+              total={filteredCourses.length}
+              onPageChange={setCoursePage}
+            />
+          </>
         )}
 
-        <form className="flex flex-wrap items-end gap-2" onSubmit={onCreateCourse}>
-          <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-sm text-slate-700">
-            New course title
-            <input
-              className="rounded border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-500"
-              value={courseTitle}
-              onChange={(e) => setCourseTitle(e.target.value)}
-              required
-            />
-          </label>
-          <button
-            className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-            type="submit"
-            disabled={createCourseState.isLoading}
-          >
-            {createCourseState.isLoading ? 'Creating…' : 'Create course'}
-          </button>
-        </form>
-        {createCourseState.isError ? (
-          <p className="mt-2 text-sm text-red-600" role="alert">
-            Could not create course.
-          </p>
-        ) : null}
+        <div className="panel-footer">
+          <p className="panel-footer-label">Add course</p>
+          <form className="form-row" onSubmit={onCreateCourse}>
+            <div className="form-row-controls">
+              <input
+                className="input"
+                value={courseTitle}
+                onChange={(e) => setCourseTitle(e.target.value)}
+                placeholder="Course title"
+                required
+                aria-label="New course title"
+              />
+              <button
+                className="btn btn-primary"
+                type="submit"
+                disabled={createCourseState.isLoading}
+              >
+                {createCourseState.isLoading ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </form>
+          {createCourseState.isError ? (
+            <p className="alert-error mt-2" role="alert">
+              Could not create course.
+            </p>
+          ) : null}
+        </div>
       </section>
 
-      <section className="mb-10">
-        <h2 className="mb-3 text-lg font-medium text-slate-900">
-          Create + upload video
-        </h2>
-        <form className="flex flex-col gap-3" onSubmit={onCreateAndUpload}>
-          <label className="flex flex-col gap-1 text-sm text-slate-700">
-            Title
-            <input
-              className="rounded border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-500"
-              value={videoTitle}
-              onChange={(e) => setVideoTitle(e.target.value)}
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-slate-700">
-            Course
-            <select
-              className="rounded border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-500"
-              value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
-              required
+      <section className="panel">
+        <header className="panel-head">
+          <h2 className="panel-title">Create & upload video</h2>
+        </header>
+        <div className="panel-body">
+          <form className="flex max-w-lg flex-col gap-4" onSubmit={onCreateAndUpload}>
+            <label className="field-label">
+              Title
+              <input
+                className="input"
+                value={videoTitle}
+                onChange={(e) => setVideoTitle(e.target.value)}
+                required
+              />
+            </label>
+            <label className="field-label">
+              Course
+              <select
+                className="select"
+                value={courseId}
+                onChange={(e) => setCourseId(e.target.value)}
+                required
+              >
+                <option value="">Select a course</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field-label">
+              File
+              <input
+                className="text-sm"
+                type="file"
+                accept="video/*,.mp4"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                required
+              />
+            </label>
+            <button
+              className="btn btn-primary w-fit"
+              type="submit"
+              disabled={
+                createVideoState.isLoading ||
+                uploadVideoState.isLoading ||
+                courses.length === 0
+              }
             >
-              <option value="">Select a course</option>
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  #{c.id} — {c.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-slate-700">
-            File
-            <input
-              className="text-sm text-slate-800"
-              type="file"
-              accept="video/*,.mp4"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              required
-            />
-          </label>
-          <button
-            className="w-fit rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-            type="submit"
-            disabled={
-              createVideoState.isLoading ||
-              uploadVideoState.isLoading ||
-              courses.length === 0
-            }
-          >
-            {createVideoState.isLoading || uploadVideoState.isLoading
-              ? 'Uploading…'
-              : 'Create & upload'}
-          </button>
-        </form>
-        {uploadMessage ? (
-          <p className="mt-2 text-sm text-slate-700">{uploadMessage}</p>
-        ) : null}
+              {createVideoState.isLoading || uploadVideoState.isLoading
+                ? 'Uploading…'
+                : 'Create & upload'}
+            </button>
+          </form>
+          {uploadMessage ? (
+            <p className="alert-info mt-3 text-sm">{uploadMessage}</p>
+          ) : null}
+        </div>
       </section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-medium text-slate-900">Videos</h2>
+      <section className="panel">
+        <header className="panel-head">
+          <h2 className="panel-title">Videos</h2>
+          {!videosLoading && !videosError && videos.length > 0 ? (
+            <span className="panel-count">
+              {videoStatusFilter !== 'all'
+                ? `${filteredVideos.length} of ${videos.length}`
+                : `${videos.length} ${videos.length === 1 ? 'video' : 'videos'}`}
+            </span>
+          ) : null}
+        </header>
+
         {videosLoading ? (
-          <p className="text-sm text-slate-600">Loading videos…</p>
+          <p className="panel-empty">Loading videos…</p>
         ) : videosError ? (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="alert-error panel-empty" role="alert">
             {getListErrorMessage(videosErr)}
           </p>
         ) : videos.length === 0 ? (
-          <p className="text-sm text-slate-600">No videos yet.</p>
+          <p className="panel-empty">No videos yet.</p>
         ) : (
-          <ul className="space-y-4">
-            {videos.map((video) => (
-              <VideoRow
-                key={video.id}
-                video={video}
-                courseTitle={
-                  courseTitleById.get(video.courseId) ?? `course #${video.courseId}`
-                }
-                playbackUrl={playbackByVideoId[video.id]}
-                isFetchingPlayback={
-                  playbackState.isFetching &&
-                  playbackState.originalArgs === video.id
-                }
-                playbackError={
-                  playbackState.isError &&
-                  playbackState.originalArgs === video.id
-                }
-                onPlayback={() => void onPlayback(video.id)}
-              />
-            ))}
-          </ul>
+          <>
+            <table className="data-table data-table-zebra">
+              <thead>
+                <tr>
+                  <th className="col-id">ID</th>
+                  <th>Title</th>
+                  <th>Course</th>
+                  <th className="col-search">
+                    <label className="sr-only" htmlFor="video-status-filter">
+                      Media status
+                    </label>
+                    <select
+                      id="video-status-filter"
+                      className="select"
+                      value={videoStatusFilter}
+                      onChange={(e) => setVideoStatusFilter(e.target.value)}
+                    >
+                      <option value="all">All statuses</option>
+                      <option value="queued">Queued</option>
+                      <option value="processing">Processing</option>
+                      <option value="ready">Ready</option>
+                      <option value="failed">Failed</option>
+                    </select>
+                  </th>
+                  <th>Publish</th>
+                  <th className="col-actions">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredVideos.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="cell-secondary">
+                      No videos match that filter.
+                    </td>
+                  </tr>
+                ) : (
+                  pagedVideos.map((video) => (
+                    <VideoTableRow
+                      key={video.id}
+                      video={video}
+                      courseTitle={
+                        courseTitleById.get(video.courseId) ??
+                        `Course ${video.courseId}`
+                      }
+                      playbackUrl={playbackByVideoId[video.id]}
+                      isFetchingPlayback={
+                        playbackState.isFetching &&
+                        playbackState.originalArgs === video.id
+                      }
+                      playbackError={
+                        playbackState.isError &&
+                        playbackState.originalArgs === video.id
+                      }
+                      showPlayer={
+                        expandedVideoId === video.id &&
+                        playbackByVideoId[video.id] != null
+                      }
+                      onPlayback={() => void onPlayback(video.id)}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+
+            <PaginationControls
+              page={videoPage}
+              pageSize={VIDEO_PAGE_SIZE}
+              total={filteredVideos.length}
+              onPageChange={setVideoPage}
+            />
+          </>
         )}
-        {pollMs > 0 ? (
-          <p className="mt-3 text-xs text-slate-500">
-            Polling media status…
-          </p>
-        ) : null}
       </section>
-    </main>
+    </>
   )
 }
 
-function VideoRow({
+function VideoTableRow({
   video,
   courseTitle,
   playbackUrl,
   isFetchingPlayback,
   playbackError,
+  showPlayer,
   onPlayback,
 }: {
   video: Video
@@ -316,71 +445,72 @@ function VideoRow({
   playbackUrl?: string
   isFetchingPlayback: boolean
   playbackError: boolean
+  showPlayer: boolean
   onPlayback: () => void
 }) {
   const playableInBrowser = playbackUrl != null && isBrowserPlayableUrl(playbackUrl)
 
   return (
-    <li className="border-t border-slate-200 pt-3 text-sm text-slate-900">
-      <p className="font-medium">
-        #{video.id} — {video.title}
-      </p>
-      <p className="mt-1 text-slate-600">
-        {courseTitle} · {video.publishState} · media: {video.mediaStatus}
-      </p>
-      {video.mediaStatus === 'failed' ? (
-        <p className="mt-2 text-sm text-red-600" role="alert">
-          Processing failed.{' '}
-          <Link className="underline hover:text-red-800" to="/notifications">
-            Check notifications
-          </Link>
-        </p>
-      ) : null}
-      {video.mediaStatus === 'ready' ? (
-        <div className="mt-2">
-          <button
-            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-50 disabled:opacity-60"
-            type="button"
-            disabled={isFetchingPlayback}
-            onClick={onPlayback}
-          >
-            {isFetchingPlayback ? 'Loading…' : playbackUrl ? 'Reload player' : 'Play'}
-          </button>
-          {playableInBrowser ? (
-            <video
-              className="mt-3 max-h-80 w-full rounded border border-slate-200 bg-black"
-              controls
-              preload="metadata"
-              src={playbackUrl}
+    <>
+      <tr>
+        <td className="col-id cell-id">{video.id}</td>
+        <td className="cell-primary">{video.title}</td>
+        <td className="cell-secondary">{courseTitle}</td>
+        <td>
+          <MediaStatusBadge status={video.mediaStatus} />
+        </td>
+        <td className="cell-secondary">{video.publishState}</td>
+        <td className="col-actions">
+          {video.mediaStatus === 'ready' ? (
+            <button
+              className="link-accent cursor-pointer border-0 bg-transparent p-0 text-sm"
+              type="button"
+              disabled={isFetchingPlayback}
+              onClick={onPlayback}
             >
-              Your browser does not support inline video playback.
-            </video>
-          ) : null}
-          {playbackUrl && !playableInBrowser ? (
-            <p className="mt-2 text-xs text-slate-600">
-              Inline playback needs an HTTPS URL (S3 presigned or CloudFront). Local{' '}
-              <code className="rounded bg-slate-100 px-1">file://</code> URLs cannot load in the
-              browser — open from disk if testing locally:{' '}
-              <a
-                className="break-all underline hover:text-slate-900"
-                href={playbackUrl}
+              {isFetchingPlayback ? 'Loading…' : playbackUrl ? 'Reload' : 'Play'}
+            </button>
+          ) : video.mediaStatus === 'failed' ? (
+            <Link className="link-accent text-sm" to="/notifications">
+              Details
+            </Link>
+          ) : (
+            <span className="cell-secondary">—</span>
+          )}
+        </td>
+      </tr>
+      {showPlayer && video.mediaStatus === 'ready' ? (
+        <tr className="row-expand">
+          <td colSpan={6}>
+            {playableInBrowser ? (
+              <video
+                className="playback-frame"
+                controls
+                preload="metadata"
+                src={playbackUrl}
               >
-                {playbackUrl}
-              </a>
-            </p>
-          ) : null}
-          {playbackError ? (
-            <p className="mt-1 text-sm text-red-600" role="alert">
-              Could not get playback URL.
-            </p>
-          ) : null}
-        </div>
+                Your browser does not support inline video playback.
+              </video>
+            ) : playbackUrl ? (
+              <p className="text-muted text-xs">
+                Inline playback needs HTTPS. Local file URLs:{' '}
+                <a className="link-accent break-all" href={playbackUrl}>
+                  {playbackUrl}
+                </a>
+              </p>
+            ) : null}
+            {playbackError ? (
+              <p className="alert-error mt-2" role="alert">
+                Could not get playback URL.
+              </p>
+            ) : null}
+          </td>
+        </tr>
       ) : null}
-    </li>
+    </>
   )
 }
 
-/** Browsers can only load http(s) in a video element; local dev returns file:// URLs. */
 function isBrowserPlayableUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://')
 }

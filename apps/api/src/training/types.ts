@@ -9,5 +9,5 @@ export interface UpsertProgressInput {
     positionSeconds?: number
 }
 
-/** Completion threshold for S3-04 (client-reported percent). */
+/** Client-reported watch percent that creates a completion. */
 export const COMPLETION_PERCENT_THRESHOLD = 90

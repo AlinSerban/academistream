@@ -32,60 +32,53 @@ export function AcceptInvitePage() {
   }
 
   return (
-    <main className="mx-auto max-w-md px-4 py-10 text-left">
-      <h1 className="text-2xl font-semibold text-slate-900">Accept invite</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        Paste the one-time token from your admin. New accounts need name and
-        password.
-      </p>
-
-      <form className="mt-6 space-y-3" onSubmit={onSubmit}>
-        <label className="block text-sm">
-          <span className="text-slate-500">Token</span>
-          <input
-            className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5"
-            required
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-slate-500">Name (new users)</span>
-          <input
-            className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-slate-500">Password (new users, min 8)</span>
-          <input
-            className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        <button
-          className="rounded border border-slate-800 bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-60"
-          type="submit"
-          disabled={state.isLoading}
-        >
-          Accept
-        </button>
-      </form>
-
-      {message ? (
-        <p className="mt-4 text-sm text-slate-700" role="status">
-          {message}
+    <div className="auth-page">
+      <div className="auth-card">
+        <h1 className="auth-brand">Accept invite</h1>
+        <p className="auth-tagline">
+          Paste the one-time token from your admin. New accounts need name and password.
         </p>
-      ) : null}
 
-      <p className="mt-6 text-sm">
-        <Link className="text-slate-700 underline" to="/login">
-          Back to login
-        </Link>
-      </p>
-    </main>
+        <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+          <label className="field-label">
+            Token
+            <input
+              className="input"
+              required
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+            />
+          </label>
+          <label className="field-label">
+            Name (new users)
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="field-label">
+            Password (new users, min 8)
+            <input
+              className="input"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          <button className="btn btn-primary" type="submit" disabled={state.isLoading}>
+            {state.isLoading ? 'Accepting…' : 'Accept invite'}
+          </button>
+        </form>
+
+        {message ? (
+          <p className="alert-info mt-4" role="status">
+            {message}
+          </p>
+        ) : null}
+
+        <p className="mt-6 text-sm">
+          <Link className="link-accent" to="/login">
+            Back to login
+          </Link>
+        </p>
+      </div>
+    </div>
   )
 }

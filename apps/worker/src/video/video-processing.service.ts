@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { VideoProcessingJob } from '../types';
+import { VideoMediaEventsJob, VideoProcessingJob } from '../types';
 import { videos, type Db } from "@academistream/db";
 import { access } from 'fs/promises';
 import path from 'path';
@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { resolveStorageRoot } from '../storage/resolve-storage-root';
 import type { ProcessingMode } from './resolve-processing-mode';
 import { resolveProcessingMode } from './resolve-processing-mode';
+import { KafkaProducerService } from '../kafka/kafka.producer';
 
 @Injectable()
 export class VideoProcessingService {
@@ -21,6 +22,8 @@ export class VideoProcessingService {
         @Inject(DRIZZLE) private readonly db: Db,
         config: ConfigService,
         private readonly notifications: NotificationsService,
+        private readonly kafka: KafkaProducerService
+
     ) {
         this.rootDir = resolveStorageRoot(config.get<string>('STORAGE_LOCAL_ROOT'));
         this.processingMode = resolveProcessingMode(config);
@@ -33,6 +36,17 @@ export class VideoProcessingService {
 
         const [video] = await this.findVideo(job.videoId, job.tenantId);
         if (!video) return;
+
+        if (job.action === 'cancel') {
+
+            if (video.mediaStatus !== 'processing' || !video.mediaConvertJobId) return;
+
+            if (this.processingMode.kind !== 'mediaconvert') return;
+            await this.processingMode.mediaConvert.cancelJob(video.mediaConvertJobId);
+
+            return;
+        }
+
         if (video.mediaStatus === 'ready') return;
         if (video.mediaStatus === 'processing' && video.mediaConvertJobId) return;
 
@@ -49,8 +63,42 @@ export class VideoProcessingService {
         }
         catch {
             await this.setStatus(job, 'failed');
-            await this.notifyMediaFailed(job, video.title);
+            await this.kafka.sendMediaEventProcessingJob({
+                videoId: job.videoId,
+                tenantId: job.tenantId,
+                status: 'failed',
+                reason: 'Processing setup failed'
+            });
         }
+    }
+
+    async handleEvents(job: VideoMediaEventsJob): Promise<void> {
+        this.logger.log(
+            `Received job videoId=${job.videoId} tenantId=${job.tenantId} status=${job.status}`,
+        );
+
+        const [video] = await this.findVideo(job.videoId, job.tenantId);
+        if (!video) return;
+
+        if (job.status === 'ready') {
+            await this.notifications.notifyTenantStaff({
+                tenantId: job.tenantId,
+                type: 'video.media_ready',
+                title: 'Video processing succeeded',
+                body: `Processing succeeded for: ${video.title}`,
+            });
+
+        }
+
+        if (job.status === 'failed') {
+            await this.notifications.notifyTenantStaff({
+                tenantId: job.tenantId,
+                type: 'video.media_failed',
+                title: 'Video processing failed',
+                body: `Processing failed for: ${video.title}; reason: ${job.reason}`,
+            });
+        }
+
     }
 
     private async submitMediaConvertJob(job: VideoProcessingJob): Promise<void> {
@@ -74,21 +122,6 @@ export class VideoProcessingService {
                 updatedAt: new Date(),
             })
             .where(and(eq(videos.id, job.videoId), eq(videos.tenantId, job.tenantId)));
-    }
-
-    /**
-     * Videos have no uploader column — notify tenant_admin, else first instructor.
-     */
-    private async notifyMediaFailed(
-        job: VideoProcessingJob,
-        videoTitle: string,
-    ): Promise<void> {
-        await this.notifications.notifyTenantStaff({
-            tenantId: job.tenantId,
-            type: 'video.media_failed',
-            title: 'Video processing failed',
-            body: `Processing failed for: ${videoTitle}`,
-        });
     }
 
     private async findVideo(videoId: number, tenantId: number) {

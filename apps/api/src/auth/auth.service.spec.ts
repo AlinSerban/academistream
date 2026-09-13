@@ -95,4 +95,25 @@ describe('AuthService', () => {
     )
 
   });
+
+  it('refresh preserves roles and isPlatformAdmin in access token', async () => {
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 1,
+      username: 'John',
+      isPlatformAdmin: false,
+      roles: [{ tenantId: 10, role: 'instructor' }],
+    });
+    jwtService.signAsync.mockResolvedValue('new-access-token');
+
+    await expect(service.refresh('refresh-token')).resolves.toEqual({
+      access_token: 'new-access-token',
+    });
+
+    expect(jwtService.signAsync).toHaveBeenCalledWith({
+      sub: 1,
+      username: 'John',
+      isPlatformAdmin: false,
+      roles: [{ tenantId: 10, role: 'instructor' }],
+    });
+  });
 });

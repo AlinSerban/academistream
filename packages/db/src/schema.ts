@@ -16,9 +16,9 @@ export const tenants = pgTable('tenants', {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     name: varchar({ length: 100 }).notNull(),
     status: tenantStatusEnum('status').notNull().default('active'),
-    /** Null = unlimited (S5 / E10). */
+    /** Null = unlimited seats. */
     maxUsers: integer('max_users'),
-    /** Null = unlimited (S5 / E10). */
+    /** Null = unlimited videos. */
     maxVideos: integer('max_videos'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull()
@@ -65,12 +65,13 @@ export const videos = pgTable('videos', {
     courseId: integer('course_id').notNull().references(() => courses.id, { onDelete: 'cascade' }),
     title: varchar({ length: 255 }).notNull(),
     storageKey: varchar('storage_key', { length: 512 }),
-    /** Transcoded output key for playback (S6-04); local path mirrors storageKey. */
+    /** Transcoded output key for playback; on local disk this mirrors storageKey. */
     playbackKey: varchar('playback_key', { length: 512 }),
-    /** AWS MediaConvert job id while transcoding (S6-03); cleared or kept after S6-04 completion. */
+    /** MediaConvert job id while transcoding; may remain after completion for audit. */
     mediaConvertJobId: varchar('mediaconvert_job_id', { length: 64 }),
     publishState: publishStateEnum('publish_state').default('draft').notNull(),
     mediaStatus: mediaStatusEnum('media_status').default('queued').notNull(),
+    mediaFailureReason: varchar('media_failure_reason', { length: 255 }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (t) => [
@@ -78,7 +79,7 @@ export const videos = pgTable('videos', {
     index('videos_course_id_idx').on(t.courseId),
 ])
 
-/** Primary assignment target: a video in the tenant (S3 / E06). */
+/** Primary assignment target: a video in the tenant. */
 export const assignments = pgTable('assignments', {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     tenantId: integer('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),

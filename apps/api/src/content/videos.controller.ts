@@ -7,6 +7,7 @@ import {
     Param,
     Patch,
     Post,
+    Query,
     Req,
     UploadedFile,
     UseInterceptors,
@@ -29,6 +30,12 @@ export class VideosController {
         return this.videosService.listAll(tenantId);
     }
 
+    @Get('stuck')
+    getStuckVideos(@Query('olderThanMinutes') olderThanMinutes: string, @Req() req: Request) {
+        const tenantId = this.getTenantId(req.user as JwtPayload);
+        return this.videosService.getStuckVideos(tenantId, Number(olderThanMinutes));
+    }
+
     @Get('by-course/:courseId')
     readByCourse(@Param('courseId') courseId: string, @Req() req: Request) {
         const tenantId = this.getTenantId(req.user as JwtPayload);
@@ -40,6 +47,7 @@ export class VideosController {
         const tenantId = this.getTenantId(req.user as JwtPayload);
         return this.videosService.getVideoById(Number(videoId), tenantId);
     }
+
 
     @Roles('tenant_admin', 'instructor', 'learner')
     @Get(':id/playback')
@@ -62,6 +70,17 @@ export class VideosController {
     upload(@Param('id') videoId: string, @UploadedFile() file: Express.Multer.File, @Req() req: Request) {
         const tenantId = this.getTenantId(req.user as JwtPayload);
         return this.videosService.uploadVideo(Number(videoId), tenantId, file);
+    }
+    @Post(':id/retry')
+    retry(@Param('id') videoId: string, @Req() req: Request) {
+        const tenantId = this.getTenantId(req.user as JwtPayload);
+        return this.videosService.retryVideo(Number(videoId), tenantId);
+    }
+
+    @Post(':id/cancel-processing')
+    cancel(@Param('id') videoId: string, @Req() req: Request) {
+        const tenantId = this.getTenantId(req.user as JwtPayload);
+        return this.videosService.cancelVideoProcessing(Number(videoId), tenantId);
     }
 
     @Patch(':id/publish')

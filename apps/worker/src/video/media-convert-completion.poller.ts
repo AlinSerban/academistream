@@ -3,12 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import { eq, and } from 'drizzle-orm';
 import { videos, type Db } from '@academistream/db';
 import { DRIZZLE } from '../db/db.module';
-import { NotificationsService } from '../notifications/notifications.service';
+import { formatMediaConvertJobFailure } from './media-convert.service';
+import type { MediaConvertJobState } from './media-convert.service';
 import type { ProcessingMode } from './resolve-processing-mode';
 import { resolveProcessingMode } from './resolve-processing-mode';
+import { KafkaProducerService } from '../kafka/kafka.producer';
 
 /**
- * Polls MediaConvert GetJob for videos stuck in processing (prototype path; SNS later).
+ * Polls MediaConvert GetJob for videos still in processing.
+ * SNS/EventBridge is the documented scale path.
  */
 @Injectable()
 export class MediaConvertCompletionPoller implements OnModuleInit, OnModuleDestroy {
@@ -20,7 +23,7 @@ export class MediaConvertCompletionPoller implements OnModuleInit, OnModuleDestr
     constructor(
         @Inject(DRIZZLE) private readonly db: Db,
         config: ConfigService,
-        private readonly notifications: NotificationsService,
+        private readonly kafka: KafkaProducerService
     ) {
         this.processingMode = resolveProcessingMode(config);
         const rawInterval = config.get<string>('MEDIACONVERT_POLL_INTERVAL_MS');
@@ -79,12 +82,15 @@ export class MediaConvertCompletionPoller implements OnModuleInit, OnModuleDestr
             return;
         }
 
-        const state = await this.processingMode.mediaConvert.getJobState(video.mediaConvertJobId);
+        const job = await this.processingMode.mediaConvert.getJob(video.mediaConvertJobId);
+        if (!job?.Status) {
+            return;
+        }
+
+        const state = job.Status as MediaConvertJobState;
 
         if (state === 'COMPLETE') {
-            const playbackKey = await this.processingMode.mediaConvert.getPlaybackKeyForJob(
-                video.mediaConvertJobId,
-            );
+            const playbackKey = this.processingMode.mediaConvert.getPlaybackKeyFromJob(job);
             if (!playbackKey) {
                 await this.markFailed(video, 'MediaConvert completed without output path');
                 return;
@@ -104,15 +110,23 @@ export class MediaConvertCompletionPoller implements OnModuleInit, OnModuleDestr
                 .returning();
 
             if (updated) {
+                await this.kafka.sendMediaEventProcessingJob({
+                    videoId: updated.id,
+                    tenantId: updated.tenantId,
+                    status: 'ready',
+                    reason: null
+                });
+
                 this.logger.log(
                     `Video ready videoId=${video.id} playbackKey=${playbackKey}`,
                 );
             }
+
             return;
         }
 
         if (state === 'ERROR' || state === 'CANCELED') {
-            await this.markFailed(video, `MediaConvert job ${state}`);
+            await this.markFailed(video, formatMediaConvertJobFailure(job));
         }
     }
 
@@ -121,7 +135,7 @@ export class MediaConvertCompletionPoller implements OnModuleInit, OnModuleDestr
         reason: string,
     ): Promise<void> {
         const [updated] = await this.db.update(videos)
-            .set({ mediaStatus: 'failed', updatedAt: new Date() })
+            .set({ mediaStatus: 'failed', mediaFailureReason: reason, updatedAt: new Date() })
             .where(and(
                 eq(videos.id, video.id),
                 eq(videos.tenantId, video.tenantId),
@@ -133,13 +147,13 @@ export class MediaConvertCompletionPoller implements OnModuleInit, OnModuleDestr
             return;
         }
 
-        this.logger.warn(`Video processing failed videoId=${video.id}: ${reason}`);
-
-        await this.notifications.notifyTenantStaff({
-            tenantId: video.tenantId,
-            type: 'video.media_failed',
-            title: 'Video processing failed',
-            body: `Processing failed for: ${video.title}`,
+        await this.kafka.sendMediaEventProcessingJob({
+            videoId: updated.id,
+            tenantId: updated.tenantId,
+            status: 'failed',
+            reason: updated.mediaFailureReason
         });
+
+        this.logger.warn(`Video processing failed videoId=${video.id}: ${reason}`);
     }
 }

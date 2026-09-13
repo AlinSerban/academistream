@@ -1,13 +1,14 @@
 import type { SerializedError } from '@reduxjs/toolkit'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { PageHeader } from '../../components/PageHeader'
 import { useLogoutMutation, useMeQuery } from './authApi'
 import type { Membership } from './types'
 
 export function MePage() {
   const navigate = useNavigate()
   const { data, isLoading, isError, error } = useMeQuery()
-  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation()
+  const [logout] = useLogoutMutation()
 
   async function onLogout() {
     await logout()
@@ -15,109 +16,85 @@ export function MePage() {
   }
 
   if (isLoading) {
-    return (
-      <main className="mx-auto max-w-lg px-4 py-10">
-        <p className="text-sm text-slate-600">Loading profile…</p>
-      </main>
-    )
+    return <p className="panel-empty">Loading profile…</p>
   }
 
   if (isError || !data) {
     return (
-      <main className="mx-auto max-w-lg px-4 py-10">
-        <p className="text-sm text-red-600" role="alert">
+      <>
+        <p className="alert-error" role="alert">
           {getMeErrorMessage(error)}
         </p>
         <button
-          className="mt-4 rounded border border-slate-300 px-3 py-2 text-sm"
+          className="btn btn-secondary mt-4"
           type="button"
           onClick={() => void onLogout()}
         >
           Back to login
         </button>
-      </main>
+      </>
     )
   }
 
   return (
-    <main className="mx-auto max-w-lg px-4 py-10 text-left">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Academistream</h1>
-          <p className="mt-1 text-sm text-slate-600">Signed in as {data.email}</p>
-        </div>
-        <div className="flex gap-2">
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/"
-          >
-            Library
-          </Link>
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/training"
-          >
-            Training
-          </Link>
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/notifications"
-          >
-            Notifications
-          </Link>
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/org"
-          >
-            Org
-          </Link>
-          <button
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50 disabled:opacity-60"
-            type="button"
-            disabled={isLoggingOut}
-            onClick={() => void onLogout()}
-          >
-            {isLoggingOut ? 'Signing out…' : 'Log out'}
-          </button>
-        </div>
-      </div>
+    <>
+      <PageHeader title="Account" subtitle={`Signed in as ${data.email}`} />
 
-      <dl className="space-y-3 text-sm">
-        <div>
-          <dt className="text-slate-500">Name</dt>
-          <dd className="font-medium text-slate-900">{data.name}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Email</dt>
-          <dd className="font-medium text-slate-900">{data.email}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-500">Platform admin</dt>
-          <dd className="font-medium text-slate-900">
-            {data.isPlatformAdmin ? 'Yes' : 'No'}
-          </dd>
-        </div>
-        <div>
-          <dt className="mb-1 text-slate-500">Memberships</dt>
-          <dd>
-            {data.memberships.length === 0 ? (
-              <span className="text-slate-700">None</span>
-            ) : (
-              <ul className="list-inside list-disc space-y-1 text-slate-900">
-                {data.memberships.map((m) => (
-                  <li key={`${m.tenantId}-${m.role}`}>{formatMembership(m)}</li>
-                ))}
-              </ul>
-            )}
-          </dd>
-        </div>
-      </dl>
-    </main>
+      <section className="panel max-w-lg">
+        <header className="panel-head">
+          <h2 className="panel-title">Profile</h2>
+        </header>
+        <dl className="panel-body space-y-4">
+          <div>
+            <dt className="text-muted mb-1 text-xs font-semibold tracking-wide uppercase">
+              Name
+            </dt>
+            <dd className="cell-primary">{data.name}</dd>
+          </div>
+          <div>
+            <dt className="text-muted mb-1 text-xs font-semibold tracking-wide uppercase">
+              Email
+            </dt>
+            <dd className="cell-primary">{data.email}</dd>
+          </div>
+          <div>
+            <dt className="text-muted mb-1 text-xs font-semibold tracking-wide uppercase">
+              Platform admin
+            </dt>
+            <dd className="cell-primary">{data.isPlatformAdmin ? 'Yes' : 'No'}</dd>
+          </div>
+          <div>
+            <dt className="text-muted mb-2 text-xs font-semibold tracking-wide uppercase">
+              Memberships
+            </dt>
+            <dd>
+              {data.memberships.length === 0 ? (
+                <span className="cell-secondary">None</span>
+              ) : (
+                <ul className="list-plain space-y-2">
+                  {data.memberships.map((m) => (
+                    <li key={`${m.tenantId}-${m.role}`} className="cell-primary">
+                      {formatMembership(m)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </dd>
+          </div>
+        </dl>
+      </section>
+    </>
   )
 }
 
 function formatMembership(membership: Membership): string {
-  return `Tenant ${membership.tenantId} — ${membership.role}`
+  const roleLabels: Record<string, string> = {
+    tenant_admin: 'Admin',
+    instructor: 'Instructor',
+    learner: 'Learner',
+  }
+  const role = roleLabels[membership.role] ?? membership.role
+  return `Tenant ${membership.tenantId} — ${role}`
 }
 
 function getMeErrorMessage(

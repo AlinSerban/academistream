@@ -1,5 +1,10 @@
-import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link, Navigate } from 'react-router-dom'
+import { PageHeader } from '../../components/PageHeader'
+import {
+  PaginationControls,
+  slicePage,
+} from '../../components/PaginationControls'
 import { useMeQuery } from '../auth/authApi'
 import { useAppSelector } from '../../app/hooks'
 import {
@@ -13,49 +18,28 @@ import {
 import type { InviteRole } from './types'
 import { useGetQuotaUsageQuery } from '../quotas/quotasApi'
 
+const PAGE_SIZE = 5
+
 export function OrgPage() {
   const { data: me } = useMeQuery()
   const role = me?.memberships[0]?.role
   const isAdmin = role === 'tenant_admin'
   const canSeeAudit = role === 'tenant_admin' || role === 'instructor'
 
+  if (role === 'learner') {
+    return <Navigate to="/training" replace />
+  }
+
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10 text-left">
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Org</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {me ? `Signed in as ${me.email}` : 'Invites, members, audit'}
-            {role ? ` · ${role}` : ''}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/"
-          >
-            Library
-          </Link>
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/training"
-          >
-            Training
-          </Link>
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/notifications"
-          >
-            Notifications
-          </Link>
-          <Link
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-            to="/me"
-          >
-            Profile
-          </Link>
-        </div>
-      </div>
+    <>
+      <PageHeader
+        title="Organization"
+        subtitle={
+          me
+            ? `Invites, members, audit · ${me.email}`
+            : 'Invites, members, audit'
+        }
+      />
 
       {isAdmin ? (
         <>
@@ -68,12 +52,21 @@ export function OrgPage() {
       {canSeeAudit ? <AuditSection /> : null}
       {role === 'instructor' ? <QuotasSection /> : null}
       {!isAdmin && !canSeeAudit ? (
-        <p className="text-sm text-slate-600">
-          Org admin tools require tenant_admin (audit also visible to
-          instructors).
-        </p>
+        <section className="panel">
+          <header className="panel-head">
+            <h2 className="panel-title">Organization</h2>
+          </header>
+          <div className="panel-body">
+            <p className="cell-primary mb-2">Workspace admin area</p>
+            <p className="text-muted text-sm">
+              Invites, members, and exports are managed by your workspace admin.
+              Switch to an admin account if you need those tools. Instructors can
+              also view audit activity when signed in with that role.
+            </p>
+          </div>
+        </section>
       ) : null}
-    </main>
+    </>
   )
 }
 
@@ -85,6 +78,13 @@ function InviteSection() {
   const [role, setRole] = useState<InviteRole>('learner')
   const [tokenOnce, setTokenOnce] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    setPage(1)
+  }, [invites.length])
+
+  const paged = slicePage(invites, page, PAGE_SIZE)
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
@@ -101,88 +101,118 @@ function InviteSection() {
   }
 
   return (
-    <section className="mb-10">
-      <h2 className="text-lg font-medium text-slate-900">Invites</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        Token is shown once (local demo; no email). Expires in 7 days.
-      </p>
-
-      <form className="mt-4 flex flex-wrap items-end gap-2" onSubmit={onCreate}>
-        <label className="text-sm">
-          <span className="block text-slate-500">Email</span>
-          <input
-            className="mt-1 rounded border border-slate-300 px-2 py-1.5"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <label className="text-sm">
-          <span className="block text-slate-500">Role</span>
-          <select
-            className="mt-1 rounded border border-slate-300 px-2 py-1.5"
-            value={role}
-            onChange={(e) => setRole(e.target.value as InviteRole)}
-          >
-            <option value="learner">learner</option>
-            <option value="instructor">instructor</option>
-            <option value="tenant_admin">tenant_admin</option>
-          </select>
-        </label>
-        <button
-          className="rounded border border-slate-800 bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-60"
-          type="submit"
-          disabled={createState.isLoading}
-        >
-          Invite
-        </button>
-      </form>
-
-      {message ? (
-        <p className="mt-2 text-sm text-slate-700" role="status">
-          {message}
-        </p>
-      ) : null}
-      {tokenOnce ? (
-        <p className="mt-2 break-all rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950">
-          Token: {tokenOnce}
-          <br />
-          Accept at{' '}
-          <Link className="underline" to={`/accept-invite?token=${tokenOnce}`}>
-            /accept-invite
-          </Link>
-        </p>
-      ) : null}
+    <section className="panel">
+      <header className="panel-head">
+        <h2 className="panel-title">Invites</h2>
+        {invites.length > 0 ? (
+          <span className="panel-count">
+            {invites.length} {invites.length === 1 ? 'invite' : 'invites'}
+          </span>
+        ) : null}
+      </header>
 
       {isError ? (
-        <p className="mt-2 text-sm text-red-600">Could not load invites.</p>
-      ) : null}
+        <p className="alert-error panel-empty">Could not load invites.</p>
+      ) : invites.length === 0 ? (
+        <p className="panel-empty">No pending invites.</p>
+      ) : (
+        <>
+          <table className="data-table data-table-zebra">
+            <thead>
+              <tr>
+                <th className="col-id">ID</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Expires</th>
+                <th className="col-actions">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((inv) => (
+                <tr key={inv.id}>
+                  <td className="col-id cell-id">{inv.id}</td>
+                  <td className="cell-primary">{inv.email}</td>
+                  <td className="cell-secondary">{inv.role}</td>
+                  <td className="cell-secondary">
+                    {new Date(inv.expiresAt).toLocaleDateString()}
+                  </td>
+                  <td className="col-actions">
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      type="button"
+                      disabled={revokeState.isLoading}
+                      onClick={() => void revokeInvite(inv.id)}
+                    >
+                      Revoke
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <PaginationControls
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={invites.length}
+            onPageChange={setPage}
+          />
+        </>
+      )}
 
-      <ul className="mt-4 space-y-2 text-sm">
-        {invites.map((inv) => (
-          <li
-            key={inv.id}
-            className="flex items-center justify-between gap-2 border-b border-slate-100 py-2"
-          >
-            <span>
-              #{inv.id} {inv.email} · {inv.role} · expires{' '}
-              {new Date(inv.expiresAt).toLocaleDateString()}
-            </span>
-            <button
-              className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-60"
-              type="button"
-              disabled={revokeState.isLoading}
-              onClick={() => void revokeInvite(inv.id)}
+      <div className="panel-footer">
+        <p className="panel-footer-label">Invite someone</p>
+        <p className="text-muted mb-3 text-sm">
+          Token is shown once (local demo; no email). Expires in 7 days.
+        </p>
+        <form className="form-row" onSubmit={onCreate}>
+          <div className="form-row-controls">
+            <input
+              className="input"
+              type="email"
+              required
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              aria-label="Invite email"
+            />
+            <select
+              className="select"
+              style={{ flex: '0 0 10rem', minWidth: '10rem' }}
+              value={role}
+              onChange={(e) => setRole(e.target.value as InviteRole)}
+              aria-label="Invite role"
             >
-              Revoke
+              <option value="learner">learner</option>
+              <option value="instructor">instructor</option>
+              <option value="tenant_admin">tenant_admin</option>
+            </select>
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={createState.isLoading}
+            >
+              Invite
             </button>
-          </li>
-        ))}
-        {invites.length === 0 ? (
-          <li className="text-slate-500">No pending invites.</li>
+          </div>
+        </form>
+        {message ? (
+          <p className="alert-info mt-3 text-sm" role="status">
+            {message}
+          </p>
         ) : null}
-      </ul>
+        {tokenOnce ? (
+          <p className="alert-warn mt-3">
+            Token: {tokenOnce}
+            <br />
+            Accept at{' '}
+            <Link className="link-accent" to={`/accept-invite?token=${tokenOnce}`}>
+              /accept-invite
+            </Link>
+          </p>
+        ) : null}
+      </div>
     </section>
   )
 }
@@ -191,6 +221,13 @@ function MembersSection() {
   const { data: members = [], isError } = useGetMembersQuery()
   const [removeMember, removeState] = useRemoveMemberMutation()
   const [message, setMessage] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    setPage(1)
+  }, [members.length])
+
+  const paged = slicePage(members, page, PAGE_SIZE)
 
   async function onRemove(userId: number) {
     setMessage(null)
@@ -202,36 +239,65 @@ function MembersSection() {
   }
 
   return (
-    <section className="mb-10">
-      <h2 className="text-lg font-medium text-slate-900">Members</h2>
+    <section className="panel">
+      <header className="panel-head">
+        <h2 className="panel-title">Members</h2>
+        {members.length > 0 ? (
+          <span className="panel-count">
+            {members.length} {members.length === 1 ? 'member' : 'members'}
+          </span>
+        ) : null}
+      </header>
       {isError ? (
-        <p className="mt-2 text-sm text-red-600">Could not load members.</p>
-      ) : null}
-      {message ? (
-        <p className="mt-2 text-sm text-red-600" role="alert">
-          {message}
-        </p>
-      ) : null}
-      <ul className="mt-4 space-y-2 text-sm">
-        {members.map((m) => (
-          <li
-            key={m.membershipId}
-            className="flex items-center justify-between gap-2 border-b border-slate-100 py-2"
-          >
-            <span>
-              {m.name} · {m.email} · {m.role}
-            </span>
-            <button
-              className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-60"
-              type="button"
-              disabled={removeState.isLoading}
-              onClick={() => void onRemove(m.userId)}
-            >
-              Remove
-            </button>
-          </li>
-        ))}
-      </ul>
+        <p className="alert-error panel-empty">Could not load members.</p>
+      ) : members.length === 0 ? (
+        <p className="panel-empty">No members.</p>
+      ) : (
+        <>
+          {message ? (
+            <p className="alert-error px-5 pt-4 text-sm" role="alert">
+              {message}
+            </p>
+          ) : null}
+          <table className="data-table data-table-zebra">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th className="col-actions">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((m) => (
+                <tr key={m.membershipId}>
+                  <td className="cell-primary">{m.name}</td>
+                  <td className="cell-secondary">{m.email}</td>
+                  <td className="cell-secondary">{m.role}</td>
+                  <td className="col-actions">
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      type="button"
+                      disabled={removeState.isLoading}
+                      onClick={() => void onRemove(m.userId)}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <PaginationControls
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={members.length}
+            onPageChange={setPage}
+          />
+        </>
+      )}
     </section>
   )
 }
@@ -267,24 +333,28 @@ function CsvExportSection() {
   }
 
   return (
-    <section className="mb-10">
-      <h2 className="text-lg font-medium text-slate-900">Completions CSV</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        Tenant-scoped export (tenant_admin only).
-      </p>
-      <button
-        className="mt-3 rounded border border-slate-800 bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-60"
-        type="button"
-        disabled={busy}
-        onClick={() => void onDownload()}
-      >
-        {busy ? 'Downloading…' : 'Download completions.csv'}
-      </button>
-      {error ? (
-        <p className="mt-2 text-sm text-red-600" role="alert">
-          {error}
+    <section className="panel">
+      <header className="panel-head">
+        <h2 className="panel-title">Completions CSV</h2>
+      </header>
+      <div className="panel-body">
+        <p className="text-muted mb-3 text-sm">
+          Tenant-scoped export (tenant_admin only).
         </p>
-      ) : null}
+        <button
+          className="btn btn-primary"
+          type="button"
+          disabled={busy}
+          onClick={() => void onDownload()}
+        >
+          {busy ? 'Downloading…' : 'Download completions.csv'}
+        </button>
+        {error ? (
+          <p className="alert-error mt-2 text-sm" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
     </section>
   )
 }
@@ -294,78 +364,123 @@ function QuotasSection() {
 
   if (isError) {
     return (
-      <section className="mb-10">
-        <h2 className="text-lg font-medium text-slate-900">Quotas</h2>
-        <p className="mt-2 text-sm text-red-600">Could not load quota usage.</p>
+      <section className="panel">
+        <header className="panel-head">
+          <h2 className="panel-title">Quotas</h2>
+        </header>
+        <div className="panel-body">
+          <p className="alert-error text-sm">Could not load quota usage.</p>
+        </div>
       </section>
     )
   }
 
   if (!data) {
     return (
-      <section className="mb-10">
-        <h2 className="text-lg font-medium text-slate-900">Quotas</h2>
-        <p className="mt-2 text-sm text-slate-600">Loading usage…</p>
+      <section className="panel">
+        <header className="panel-head">
+          <h2 className="panel-title">Quotas</h2>
+        </header>
+        <div className="panel-body">
+          <p className="text-muted text-sm">Loading usage…</p>
+        </div>
       </section>
     )
   }
 
   return (
-    <section className="mb-10">
-      <h2 className="text-lg font-medium text-slate-900">Quotas</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        Tenant {data.tenantId} — members and videos vs plan limits.
-      </p>
-      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-        <div className="rounded border border-slate-200 p-3">
-          <dt className="text-slate-500">Members</dt>
-          <dd className="font-medium text-slate-900">
-            {data.usage.members}
-            {data.limits.maxUsers != null
-              ? ` / ${data.limits.maxUsers}`
-              : ' / unlimited'}
-          </dd>
-        </div>
-        <div className="rounded border border-slate-200 p-3">
-          <dt className="text-slate-500">Videos</dt>
-          <dd className="font-medium text-slate-900">
-            {data.usage.videos}
-            {data.limits.maxVideos != null
-              ? ` / ${data.limits.maxVideos}`
-              : ' / unlimited'}
-          </dd>
-        </div>
-      </dl>
+    <section className="panel">
+      <header className="panel-head">
+        <h2 className="panel-title">Quotas</h2>
+      </header>
+      <div className="panel-body">
+        <p className="text-muted mb-4 text-sm">
+          Tenant {data.tenantId} — members and videos vs plan limits.
+        </p>
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <div className="stat-card">
+            <dt>Members</dt>
+            <dd>
+              {data.usage.members}
+              {data.limits.maxUsers != null
+                ? ` / ${data.limits.maxUsers}`
+                : ' / unlimited'}
+            </dd>
+          </div>
+          <div className="stat-card">
+            <dt>Videos</dt>
+            <dd>
+              {data.usage.videos}
+              {data.limits.maxVideos != null
+                ? ` / ${data.limits.maxVideos}`
+                : ' / unlimited'}
+            </dd>
+          </div>
+        </dl>
+      </div>
     </section>
   )
 }
 
 function AuditSection() {
   const { data: events = [], isError } = useGetAuditEventsQuery(50)
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    setPage(1)
+  }, [events.length])
+
+  const paged = slicePage(events, page, PAGE_SIZE)
 
   return (
-    <section className="mb-10">
-      <h2 className="text-lg font-medium text-slate-900">Audit events</h2>
-      <p className="mt-1 text-sm text-slate-600">Newest first for this tenant.</p>
-      {isError ? (
-        <p className="mt-2 text-sm text-red-600">Could not load audit events.</p>
-      ) : null}
-      <ul className="mt-4 max-h-80 space-y-2 overflow-y-auto text-sm">
-        {events.map((ev) => (
-          <li key={ev.id} className="border-b border-slate-100 py-2">
-            <span className="font-medium">{ev.action}</span>
-            {ev.entityType ? ` · ${ev.entityType}` : ''}
-            {ev.entityId != null ? ` #${ev.entityId}` : ''}
-            <span className="block text-xs text-slate-500">
-              {new Date(ev.createdAt).toLocaleString()}
-              {ev.actorUserId != null ? ` · actor ${ev.actorUserId}` : ''}
-            </span>
-          </li>
-        ))}
-        {events.length === 0 ? (
-          <li className="text-slate-500">No events yet.</li>
+    <section className="panel">
+      <header className="panel-head">
+        <h2 className="panel-title">Audit events</h2>
+        {events.length > 0 ? (
+          <span className="panel-count">
+            {events.length} {events.length === 1 ? 'event' : 'events'}
+          </span>
         ) : null}
-      </ul>
+      </header>
+      {isError ? (
+        <p className="alert-error panel-empty">Could not load audit events.</p>
+      ) : events.length === 0 ? (
+        <p className="panel-empty">No events yet.</p>
+      ) : (
+        <>
+          <p className="text-muted px-5 pt-3 text-sm">Newest first for this tenant.</p>
+          <table className="data-table data-table-zebra">
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((ev) => (
+                <tr key={ev.id}>
+                  <td className="cell-primary">{ev.action}</td>
+                  <td className="cell-secondary">
+                    {ev.entityType ?? '—'}
+                    {ev.entityId != null ? ` #${ev.entityId}` : ''}
+                  </td>
+                  <td className="cell-secondary">
+                    {new Date(ev.createdAt).toLocaleString()}
+                    {ev.actorUserId != null ? ` · actor ${ev.actorUserId}` : ''}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <PaginationControls
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={events.length}
+            onPageChange={setPage}
+          />
+        </>
+      )}
     </section>
   )
 }

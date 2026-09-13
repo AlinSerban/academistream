@@ -17,7 +17,7 @@ export class NotificationsService {
     ) { }
 
     /**
-     * Best-effort in-app notification (+ optional email stub).
+     * Best-effort in-app notification (+ optional local email).
      * Failures are logged and never throw, so primary actions are not blocked.
      *
      * notifyTenantStaff: first tenant_admin, else first instructor (no uploader on videos).
@@ -45,7 +45,7 @@ export class NotificationsService {
         type: NotificationType | string
         title?: string
         body?: string
-        /** When set, the local mail stub logs a would-send (S5-02); SES commented in mailer. */
+        /** When set, the local mailer logs a would-send. */
         email?: string
     }): Promise<void> {
         if (input.userId != null) {
@@ -77,7 +77,7 @@ export class NotificationsService {
             })
         } catch (err) {
             this.logger.warn(
-                `mail stub failed for ${input.type} to ${input.email}: ${String(err)}`,
+                `local mailer failed for ${input.type} to ${input.email}: ${String(err)}`,
             )
         }
     }

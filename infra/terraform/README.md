@@ -1,10 +1,10 @@
-# Terraform — Academistream (Sprint 6 media)
+# Terraform — Academistream media
 
-AWS resources for the **media path**: S3, IAM (MediaConvert role), CloudFront (later sprint).
+AWS resources for the **media path**: S3 and IAM (MediaConvert role). CloudFront is optional and set up manually (see below).
 
-App hosting stays on EC2 + Docker for the prototype; see `docs/engineering/SCALE_PATH.md`.
+App hosting stays on EC2 + Docker for the v1 demo; see `docs/engineering/SCALE_PATH.md`.
 
-## What this stack creates (S6-01)
+## What this stack creates
 
 | Resource | Purpose |
 |----------|---------|
@@ -58,16 +58,14 @@ Or all at once:
 terraform output -json
 ```
 
-## Wire into the app (after S6-02+)
+## Wire into the app
 
-Until the S3 adapter and worker MediaConvert path ship, the app keeps **`STORAGE_PROVIDER=local`**.
-
-When enabling AWS:
+Default local/CI stays on **`STORAGE_PROVIDER=local`**. To use this stack:
 
 1. `terraform apply` (this directory).
 2. Copy outputs into `.env` (see repo `.env.example`).
-3. Ensure API + worker can reach AWS (same credentials as CLI, or an EC2 instance role later).
-4. Set `STORAGE_PROVIDER=s3` when S6-02 is implemented.
+3. Ensure API + worker can reach AWS (same credentials as CLI, or an EC2 instance role).
+4. Set **`STORAGE_PROVIDER=s3`** on both API and worker, then restart.
 
 | `.env` variable | Source |
 |-----------------|--------|
@@ -78,7 +76,7 @@ When enabling AWS:
 | `CLOUDFRONT_KEY_PAIR_ID` | CloudFront key pair (public key in ACM/CloudFront) |
 | `CLOUDFRONT_PRIVATE_KEY_PATH` | Path to PEM private key on API host (never commit) |
 
-### CloudFront playback (S6-05 — manual console setup)
+### CloudFront playback (optional — manual console setup)
 
 Terraform does not create the distribution yet. For signed playback:
 
@@ -97,8 +95,8 @@ Terraform does not create the distribution yet. For signed playback:
 
 | Mode | Storage | Transcode | Playback |
 |------|---------|-----------|----------|
-| **Default (dev/CI)** | Local disk (`STORAGE_LOCAL_ROOT`) | Worker stub | Local file URL |
-| **AWS (S6-02+)** | S3 | MediaConvert | CloudFront signed URL (S6-05) |
+| **Default (dev/CI)** | Local disk (`STORAGE_LOCAL_ROOT`) | Local file check | Local file URL |
+| **AWS** | S3 | MediaConvert | S3 Presigned or CloudFront signed URL |
 
 `npm test` / CI should stay on **local** — no real AWS in unit tests.
 
@@ -106,7 +104,7 @@ Terraform does not create the distribution yet. For signed playback:
 
 - **Do not commit** `.terraform/`, `*.tfstate`, or `*.tfstate.backup`.
 - Access keys stay in `~/.aws/credentials`, not in this repo.
-- Optional later: remote state (S3 + DynamoDB lock) — out of scope for prototype S6-01.
+- Optional later: remote state (S3 + DynamoDB lock) — see `docs/engineering/SCALE_PATH.md`.
 
 ## Teardown
 

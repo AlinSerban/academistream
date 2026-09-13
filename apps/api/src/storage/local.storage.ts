@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, unlink, writeFile } from 'fs/promises';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import type { PutObjectInput, StorageService } from './storage.types';
@@ -17,11 +17,25 @@ export class LocalStorageService implements StorageService {
         return { key };
     }
 
-    /** Local file URL; CloudFront signing is S6-05. */
+    /** Local file URL (CloudFront signing is used only on the S3/CloudFront path). */
     async getSignedGetUrl(key: string, expiresInSeconds = 3600): Promise<string> {
         void expiresInSeconds;
         const filePath = this.resolveSafePath(key);
         return pathToFileURL(filePath).href;
+    }
+
+    async deleteObject(key: string): Promise<void> {
+        assertValidStorageKey(key);
+
+        try {
+            const filePath = this.resolveSafePath(key);
+            await unlink(filePath);
+        }
+        catch (err) {
+            if (err && typeof err === 'object' && 'code' in err && err.code == 'ENOENT')
+                return;
+            throw err;
+        }
     }
 
     private resolveSafePath(key: string): string {

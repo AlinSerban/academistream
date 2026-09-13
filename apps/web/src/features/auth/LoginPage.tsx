@@ -29,54 +29,50 @@ export function LoginPage() {
   const errorMessage = getLoginErrorMessage(error)
 
   return (
-    <main className="mx-auto flex min-h-svh max-w-md flex-col justify-center px-4 py-10">
-      <h1 className="mb-2 text-3xl font-semibold tracking-tight text-slate-900">
-        Academistream
-      </h1>
-      <p className="mb-8 text-sm text-slate-600">Sign in to your account</p>
+    <div className="auth-page">
+      <div className="auth-card">
+        <h1 className="auth-brand">Academistream</h1>
+        <p className="auth-tagline">Private training video for your organization</p>
 
-      <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-        <label className="flex flex-col gap-1 text-left text-sm text-slate-700">
-          Email
-          <input
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-500"
-            type="email"
-            name="email"
-            autoComplete="username"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </label>
+        <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+          <label className="field-label">
+            Email
+            <input
+              className="input"
+              type="email"
+              name="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </label>
 
-        <label className="flex flex-col gap-1 text-left text-sm text-slate-700">
-          Password
-          <input
-            className="rounded border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-500"
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </label>
+          <label className="field-label">
+            Password
+            <input
+              className="input"
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </label>
 
-        {errorMessage ? (
-          <p className="text-sm text-red-600" role="alert">
-            {errorMessage}
-          </p>
-        ) : null}
+          {errorMessage ? (
+            <p className="alert-error" role="alert">
+              {errorMessage}
+            </p>
+          ) : null}
 
-        <button
-          className="mt-2 rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-          type="submit"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Signing in…' : 'Sign in'}
-        </button>
-      </form>
-    </main>
+          <button className="btn btn-primary mt-2 w-full" type="submit" disabled={isLoading}>
+            {isLoading ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+      </div>
+    </div>
   )
 }
 

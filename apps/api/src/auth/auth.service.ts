@@ -61,12 +61,21 @@ export class AuthService {
             throw new UnauthorizedException();
         }
 
-        const payload = { sub: validToken.sub, username: validToken.username }
+        let user = await this.usersService.findUserById(validToken.sub);
+        if (!user) throw new UnauthorizedException();
+        let memberships = await this.usersService.findMembershipsByUserId(user.id);
 
-        return {
-            access_token: await this.jwtService.signAsync(payload, { expiresIn: '60s' })
+        const payload = {
+            sub: user.id,
+            username: user.name,
+            isPlatformAdmin: user.isPlatformAdmin,
+            roles: memberships
 
         }
+
+        return {
+            access_token: await this.jwtService.signAsync(payload),
+        };
 
     }
 

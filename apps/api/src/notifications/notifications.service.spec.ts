@@ -50,7 +50,7 @@ describe('NotificationsService', () => {
     expect(mail.send).not.toHaveBeenCalled()
   })
 
-  it('notify calls mail stub when email is provided', async () => {
+  it('notify calls local mailer when email is provided', async () => {
     const values = jest.fn().mockResolvedValue(undefined)
     db.insert.mockReturnValue({ values })
 

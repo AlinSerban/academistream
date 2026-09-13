@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+    DeleteObjectCommand,
     GetObjectCommand,
     PutObjectCommand,
     S3Client,
@@ -46,5 +47,16 @@ export class S3StorageService implements StorageService {
             }),
             { expiresIn: expiresInSeconds },
         );
+    }
+
+    async deleteObject(key: string): Promise<void> {
+        assertValidStorageKey(key);
+
+        await this.client.send(
+            new DeleteObjectCommand({
+                Bucket: this.bucket,
+                Key: key
+            })
+        )
     }
 }

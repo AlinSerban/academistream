@@ -10,16 +10,16 @@ describe('MediaConvertCompletionPoller', () => {
     let db: { select: jest.Mock; update: jest.Mock };
     let notifications: { notifyTenantStaff: jest.Mock };
     let mediaConvert: {
-        getJobState: jest.Mock;
-        getPlaybackKeyForJob: jest.Mock;
+        getJob: jest.Mock;
+        getPlaybackKeyFromJob: jest.Mock;
     };
 
     beforeEach(async () => {
         db = { select: jest.fn(), update: jest.fn() };
         notifications = { notifyTenantStaff: jest.fn().mockResolvedValue(undefined) };
         mediaConvert = {
-            getJobState: jest.fn(),
-            getPlaybackKeyForJob: jest.fn(),
+            getJob: jest.fn(),
+            getPlaybackKeyFromJob: jest.fn(),
         };
 
         const module: TestingModule = await Test.createTestingModule({
@@ -62,8 +62,8 @@ describe('MediaConvertCompletionPoller', () => {
             }),
         });
 
-        mediaConvert.getJobState.mockResolvedValue('COMPLETE');
-        mediaConvert.getPlaybackKeyForJob.mockResolvedValue(
+        mediaConvert.getJob.mockResolvedValue({ Status: 'COMPLETE' });
+        mediaConvert.getPlaybackKeyFromJob.mockReturnValue(
             'tenants/10/videos/3/output/source.mp4',
         );
 
@@ -95,7 +95,11 @@ describe('MediaConvertCompletionPoller', () => {
             }),
         });
 
-        mediaConvert.getJobState.mockResolvedValue('ERROR');
+        mediaConvert.getJob.mockResolvedValue({
+            Status: 'ERROR',
+            ErrorCode: 1040,
+            ErrorMessage: 'Invalid selector_sequence_id [0] specified for audio_description [1].',
+        });
 
         const returning = jest.fn().mockResolvedValue([{ id: 3, mediaStatus: 'failed' }]);
         const where = jest.fn().mockReturnValue({ returning });
@@ -123,8 +127,8 @@ describe('MediaConvertCompletionPoller', () => {
             }),
         });
 
-        mediaConvert.getJobState.mockResolvedValue('COMPLETE');
-        mediaConvert.getPlaybackKeyForJob.mockResolvedValue('tenants/10/videos/3/output/a.mp4');
+        mediaConvert.getJob.mockResolvedValue({ Status: 'COMPLETE' });
+        mediaConvert.getPlaybackKeyFromJob.mockResolvedValue('tenants/10/videos/3/output/a.mp4');
 
         const returning = jest.fn().mockResolvedValue([]);
         db.update.mockReturnValue({

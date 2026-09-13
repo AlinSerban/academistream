@@ -21,4 +21,23 @@ describe('parsePlaybackKeyFromJob', () => {
     it('returns null when output path missing', () => {
         expect(parsePlaybackKeyFromJob({} as Job, 'test-bucket')).toBeNull();
     });
+
+    it('derives key from job settings when OutputFilePaths omitted', () => {
+        const job = {
+            Settings: {
+                Inputs: [{ FileInput: 's3://test-bucket/tenants/10/videos/3/source.mp4' }],
+                OutputGroups: [{
+                    OutputGroupSettings: {
+                        FileGroupSettings: {
+                            Destination: 's3://test-bucket/tenants/10/videos/3/output/',
+                        },
+                    },
+                }],
+            },
+        } as Job;
+
+        expect(parsePlaybackKeyFromJob(job, 'test-bucket')).toBe(
+            'tenants/10/videos/3/output/source.mp4',
+        );
+    });
 });

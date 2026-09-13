@@ -21,8 +21,8 @@ describe('AWS media pipeline (mocked)', () => {
     let notifications: { notifyTenantStaff: jest.Mock };
     let mediaConvert: {
         submitTranscodeJob: jest.Mock;
-        getJobState: jest.Mock;
-        getPlaybackKeyForJob: jest.Mock;
+        getJob: jest.Mock;
+        getPlaybackKeyFromJob: jest.Mock;
     };
     let processing: VideoProcessingService;
     let poller: MediaConvertCompletionPoller;
@@ -32,8 +32,8 @@ describe('AWS media pipeline (mocked)', () => {
         notifications = { notifyTenantStaff: jest.fn().mockResolvedValue(undefined) };
         mediaConvert = {
             submitTranscodeJob: jest.fn(),
-            getJobState: jest.fn(),
-            getPlaybackKeyForJob: jest.fn(),
+            getJob: jest.fn(),
+            getPlaybackKeyFromJob: jest.fn(),
         };
 
         const configGet = jest.fn((key: string) => awsConfig[key as keyof typeof awsConfig]);
@@ -125,8 +125,8 @@ describe('AWS media pipeline (mocked)', () => {
             }),
         });
 
-        mediaConvert.getJobState.mockResolvedValue('COMPLETE');
-        mediaConvert.getPlaybackKeyForJob.mockResolvedValue(
+        mediaConvert.getJob.mockResolvedValue({ Status: 'COMPLETE' });
+        mediaConvert.getPlaybackKeyFromJob.mockReturnValue(
             'tenants/10/videos/3/output/source.mp4',
         );
 

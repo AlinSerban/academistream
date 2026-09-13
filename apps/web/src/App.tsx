@@ -1,4 +1,6 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { AppShell } from './components/AppShell'
+import { SyncBrowserRouter } from './components/SyncBrowserRouter'
 import { LoginPage } from './features/auth/LoginPage'
 import { MePage } from './features/auth/MePage'
 import { RequireAuth } from './features/auth/RequireAuth'
@@ -11,54 +13,27 @@ import { NotificationsPage } from './features/notifications/NotificationsPage'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <SyncBrowserRouter>
       <SessionBootstrap>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/accept-invite" element={<AcceptInvitePage />} />
           <Route
-            path="/"
             element={
               <RequireAuth>
-                <LibraryPage />
+                <AppShell />
               </RequireAuth>
             }
-          />
-          <Route
-            path="/training"
-            element={
-              <RequireAuth>
-                <TrainingPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/org"
-            element={
-              <RequireAuth>
-                <OrgPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/notifications"
-            element={
-              <RequireAuth>
-                <NotificationsPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/me"
-            element={
-              <RequireAuth>
-                <MePage />
-              </RequireAuth>
-            }
-          />
+          >
+            <Route path="/" element={<LibraryPage />} />
+            <Route path="/training" element={<TrainingPage />} />
+            <Route path="/org" element={<OrgPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/me" element={<MePage />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </SessionBootstrap>
-    </BrowserRouter>
+    </SyncBrowserRouter>
   )
 }

@@ -2,6 +2,7 @@ import { Body, Controller, HttpCode, HttpStatus, Post, Res, Req, Get } from '@ne
 import { AuthService } from './auth.service';
 import type { Response, Request } from 'express';
 import { Public } from './public.decorator';
+import { JwtPayload } from './types';
 
 @Controller('auth')
 export class AuthController {
@@ -31,4 +32,5 @@ export class AuthController {
         const user = req.user as { sub: number, username: string }
         return this.authService.getMe(user.sub);
     }
+
 }

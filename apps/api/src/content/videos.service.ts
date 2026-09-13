@@ -1,9 +1,9 @@
-import { Inject, Injectable, ForbiddenException, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, ForbiddenException, NotFoundException, ConflictException, BadRequestException } from "@nestjs/common";
 import type { Db } from "@academistream/db";
 import { courses, videos } from "@academistream/db";
 import { DRIZZLE } from "../db/db.module";
 import type { CreateVideoInput, PublishState, UpdateVideoInput } from "./types";
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray, lt } from 'drizzle-orm';
 import type { StorageService } from "../storage/storage.types";
 import { STORAGE } from "../storage/storage.module";
 import { PlaybackUrlService } from "../storage/playback-url.service";
@@ -97,7 +97,29 @@ export class VideosService {
             .where(and(eq(videos.courseId, courseId), eq(videos.tenantId, tenantId)));
     }
 
+    async getStuckVideos(tenantId: number, minutes: number) {
+        if (!Number.isFinite(minutes) || minutes <= 0)
+            throw new BadRequestException('olderThanMinutes must be a positive number');
+
+        const cutoff = new Date(Date.now() - minutes * 60_000);
+        return await this.db.select()
+            .from(videos)
+            .where(and
+                (eq(videos.tenantId, tenantId),
+                    inArray(videos.mediaStatus, ['queued', 'processing']),
+                    lt(videos.updatedAt, cutoff)
+                ));
+    }
+
     async deleteVideo(videoId: number, tenantId: number) {
+        const video = await this.getVideoById(videoId, tenantId);
+
+        if (video.mediaStatus === 'processing') throw new ConflictException('Cannot delete video while processing');
+        if (video.storageKey)
+            await this.storage.deleteObject(video.storageKey);
+        if (video.playbackKey && video.playbackKey !== video.storageKey)
+            await this.storage.deleteObject(video.playbackKey);
+
         const [deleted] = await this.db.delete(videos)
             .where(and(eq(videos.id, videoId), eq(videos.tenantId, tenantId)))
             .returning();
@@ -122,6 +144,8 @@ export class VideosService {
             .set({
                 storageKey: key,
                 mediaStatus: 'queued',
+                mediaFailureReason: null,
+                mediaConvertJobId: null,
                 updatedAt: new Date(),
             })
             .where(and(eq(videos.id, videoId), eq(videos.tenantId, tenantId)))
@@ -133,9 +157,59 @@ export class VideosService {
             videoId,
             tenantId,
             storageKey: key,
+            action: 'process'
         });
 
         return updated;
+    }
+
+    async retryVideo(videoId: number, tenantId: number) {
+        const video = await this.getVideoById(videoId, tenantId);
+
+        if (video.mediaStatus !== 'failed' || video.storageKey == null) throw new NotFoundException();
+
+        const [updated] = await this.db
+            .update(videos)
+            .set({
+                mediaConvertJobId: null,
+                playbackKey: null,
+                mediaFailureReason: null,
+                mediaStatus: 'queued',
+                updatedAt: new Date()
+            })
+            .where(and(eq(videos.id, videoId), eq(videos.tenantId, tenantId)))
+            .returning();
+
+        if (!updated) throw new NotFoundException();
+
+
+        await this.kafka.sendVideoProcessingJob({
+            videoId,
+            tenantId,
+            storageKey: video.storageKey,
+            action: 'process'
+        })
+
+        return updated;
+
+    }
+
+    async cancelVideoProcessing(videoId: number, tenantId: number) {
+
+        const video = await this.getVideoById(videoId, tenantId);
+        if (video.mediaStatus !== 'processing' || !video.mediaConvertJobId) {
+            throw new NotFoundException();
+        }
+
+        await this.kafka.sendVideoProcessingJob({
+            videoId,
+            tenantId,
+            storageKey: '',
+            action: 'cancel'
+        });
+
+        return video;
+
     }
 
     async getPlaybackUrl(videoId: number, tenantId: number, role: string) {
@@ -163,4 +237,6 @@ export class VideosService {
 
         if (!course) throw new NotFoundException();
     }
+
+
 }

@@ -1,5 +1,8 @@
 import type { JobSettings } from '@aws-sdk/client-mediaconvert';
 
+/** Input audio selector name — must match AudioDescriptions.AudioSourceName. */
+export const MEDIACONVERT_AUDIO_SELECTOR = 'Audio Selector 1';
+
 /** MediaConvert job settings: one MP4 output under the given S3 prefix (no bucket in prefix). */
 export function buildMediaConvertJobSettings(
     bucket: string,
@@ -9,7 +12,14 @@ export function buildMediaConvertJobSettings(
     const normalizedPrefix = outputPrefix.endsWith('/') ? outputPrefix : `${outputPrefix}/`;
 
     return {
-        Inputs: [{ FileInput: `s3://${bucket}/${inputKey}` }],
+        Inputs: [{
+            FileInput: `s3://${bucket}/${inputKey}`,
+            AudioSelectors: {
+                [MEDIACONVERT_AUDIO_SELECTOR]: {
+                    DefaultSelection: 'DEFAULT',
+                },
+            },
+        }],
         OutputGroups: [{
             Name: 'File Group',
             OutputGroupSettings: {
@@ -30,6 +40,7 @@ export function buildMediaConvertJobSettings(
                     },
                 },
                 AudioDescriptions: [{
+                    AudioSourceName: MEDIACONVERT_AUDIO_SELECTOR,
                     CodecSettings: {
                         Codec: 'AAC',
                         AacSettings: {

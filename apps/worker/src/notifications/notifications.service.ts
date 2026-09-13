@@ -68,7 +68,7 @@ export class NotificationsService {
             })
         } catch (err) {
             this.logger.warn(
-                `mail stub failed for ${input.type} to ${input.email}: ${String(err)}`,
+                `local mailer failed for ${input.type} to ${input.email}: ${String(err)}`,
             )
         }
     }

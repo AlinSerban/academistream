@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAppSelector } from '../../app/hooks'
 import { useRefreshMutation } from './authApi'
@@ -10,21 +10,34 @@ interface SessionBootstrapProps {
 /** Restores access token from HttpOnly refresh cookie once on startup. */
 export function SessionBootstrap({ children }: SessionBootstrapProps) {
   const accessToken = useAppSelector((state) => state.auth.accessToken)
-  const [refresh, { isUninitialized, isLoading }] = useRefreshMutation()
-  const attempted = useRef(false)
+  const [refresh] = useRefreshMutation()
+  const [ready, setReady] = useState(() => Boolean(accessToken))
 
   useEffect(() => {
-    if (accessToken || attempted.current) return
-    attempted.current = true
+    if (accessToken) {
+      setReady(true)
+      return
+    }
+
+    let cancelled = false
     void refresh()
+      .unwrap()
+      .catch(() => {
+        // No cookie / API down / expired — continue to public routes
+      })
+      .finally(() => {
+        if (!cancelled) setReady(true)
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [accessToken, refresh])
 
-  const restoring = !accessToken && (isUninitialized || isLoading)
-
-  if (restoring) {
+  if (!ready) {
     return (
-      <main className="mx-auto flex min-h-svh max-w-md items-center justify-center px-4">
-        <p className="text-sm text-slate-600">Checking session…</p>
+      <main className="auth-page">
+        <p className="text-muted text-sm">Checking session…</p>
       </main>
     )
   }

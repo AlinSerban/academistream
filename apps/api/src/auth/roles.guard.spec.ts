@@ -85,6 +85,18 @@ describe('RolesGuard', () => {
     expect(guard.canActivate(createContext(learner))).toBe(true);
   });
 
+  it('forbids when roles are missing from the token', () => {
+    const partialUser = {
+      sub: 1,
+      username: 'John',
+      isPlatformAdmin: false,
+    } as JwtPayload;
+    reflector.getAllAndOverride.mockReturnValue(['tenant_admin']);
+    expect(() => guard.canActivate(createContext(partialUser))).toThrow(
+      ForbiddenException,
+    );
+  });
+
   it('forbids learner when only admin/instructor roles are required', () => {
     const learner: JwtPayload = {
       sub: 4,
