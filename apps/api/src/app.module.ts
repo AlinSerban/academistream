@@ -14,6 +14,7 @@ import { AuditModule } from './audit/audit.module';
 import { OrgModule } from './org/org.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { QuotasModule } from './quotas/quotas.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { QuotasModule } from './quotas/quotas.module';
       isGlobal: true,
       envFilePath: ['.env', '../../.env']
     }),
+    RedisModule,
     DbModule,
     AuthModule,
     UsersModule,

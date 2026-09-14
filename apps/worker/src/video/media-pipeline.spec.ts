@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DRIZZLE } from '../db/db.module';
+import { KafkaProducerService } from '../kafka/kafka.producer';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { MediaConvertService } from './media-convert.service';
 import { MediaConvertCompletionPoller } from './media-convert-completion.poller';
@@ -19,6 +20,7 @@ describe('AWS media pipeline (mocked)', () => {
 
     let db: { select: jest.Mock; update: jest.Mock };
     let notifications: { notifyTenantStaff: jest.Mock };
+    let kafka: { sendMediaEventProcessingJob: jest.Mock };
     let mediaConvert: {
         submitTranscodeJob: jest.Mock;
         getJob: jest.Mock;
@@ -30,6 +32,9 @@ describe('AWS media pipeline (mocked)', () => {
     beforeEach(async () => {
         db = { select: jest.fn(), update: jest.fn() };
         notifications = { notifyTenantStaff: jest.fn().mockResolvedValue(undefined) };
+        kafka = {
+            sendMediaEventProcessingJob: jest.fn().mockResolvedValue(undefined),
+        };
         mediaConvert = {
             submitTranscodeJob: jest.fn(),
             getJob: jest.fn(),
@@ -44,6 +49,7 @@ describe('AWS media pipeline (mocked)', () => {
                 { provide: DRIZZLE, useValue: db },
                 { provide: ConfigService, useValue: { get: configGet } },
                 { provide: NotificationsService, useValue: notifications },
+                { provide: KafkaProducerService, useValue: kafka },
             ],
         }).compile();
 
@@ -60,6 +66,7 @@ describe('AWS media pipeline (mocked)', () => {
                 { provide: DRIZZLE, useValue: db },
                 { provide: ConfigService, useValue: { get: configGet } },
                 { provide: NotificationsService, useValue: notifications },
+                { provide: KafkaProducerService, useValue: kafka },
             ],
         }).compile();
 
@@ -104,6 +111,7 @@ describe('AWS media pipeline (mocked)', () => {
             videoId: 3,
             tenantId: 10,
             storageKey: 'tenants/10/videos/3/source.mp4',
+            action: 'process',
         });
 
         expect(mediaConvert.submitTranscodeJob).toHaveBeenCalledWith(
@@ -132,7 +140,12 @@ describe('AWS media pipeline (mocked)', () => {
 
         const setReady = jest.fn().mockReturnValue({
             where: jest.fn().mockReturnValue({
-                returning: jest.fn().mockResolvedValue([{ id: 3, mediaStatus: 'ready' }]),
+                returning: jest.fn().mockResolvedValue([{
+                    id: 3,
+                    tenantId: 10,
+                    mediaStatus: 'ready',
+                    mediaFailureReason: null,
+                }]),
             }),
         });
         db.update.mockReturnValue({ set: setReady });
@@ -145,6 +158,12 @@ describe('AWS media pipeline (mocked)', () => {
                 playbackKey: 'tenants/10/videos/3/output/source.mp4',
             }),
         );
+        expect(kafka.sendMediaEventProcessingJob).toHaveBeenCalledWith({
+            videoId: 3,
+            tenantId: 10,
+            status: 'ready',
+            reason: null,
+        });
         expect(notifications.notifyTenantStaff).not.toHaveBeenCalled();
     });
 });

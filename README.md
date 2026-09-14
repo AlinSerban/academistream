@@ -17,6 +17,8 @@ B2B private training-video platform. Customer companies get their own org, users
 
 **Port note:** Compose Postgres uses host `5432`. If a Windows PostgreSQL service is also bound to `5432`, stop it (or set startup to Manual) so `DATABASE_URL` hits Docker, not the local install.
 
+**Redis:** used by the API for **login rate limiting** (`REDIS_URL`, Compose host port `16379`). Without Redis the API will not start.
+
 ## Local setup
 
 ```bash
@@ -56,7 +58,7 @@ Auth and isolation tests are **unit tests with Jest mocks** — no real Postgres
 
 Run: `npm test -w @academistream/api` (also in CI). Integration / Supertest against a real database is a documented next step, not required for current CI.
 
-Seed is idempotent (re-run skips existing emails/tenants). Dev accounts (password from `SEED_PASSWORD` in `.env`, default `Password123!`):
+Seed is idempotent (re-run skips existing emails). Seed tenants get demo-tight quotas by default (`SEED_MAX_USERS=20`, `SEED_MAX_VIDEOS=8`) and those limits are **re-applied** on each seed. Dev accounts (password from `SEED_PASSWORD` in `.env`, default `Password123!`):
 
 - Platform admin: `platform@academistream.local` (no tenant membership)
 - Acme: `admin@acme.local`, `instructor@acme.local`, `learner@acme.local`
@@ -75,9 +77,9 @@ npm run web:dev
 - API health: http://localhost:3000/health  
 - Web: http://localhost:5173  
 
-**Web auth:** Vite proxies `/api` → API (`localhost:3000`). Access token stays in Redux memory; refresh uses the HttpOnly cookie (`credentials: 'include'`). Seed users: see Tenancy section above.
+**Web auth:** Vite proxies `/api` → API (`localhost:3000`). Access token stays in Redux memory; refresh uses the HttpOnly cookie (`credentials: 'include'`). Seed users: see Tenancy section above. Login is rate-limited via Redis (default 10 attempts / IP / minute and 5 / email / minute).
 
-After login, staff land on the **content library** (`/`): list courses/videos, create+upload a file, poll `mediaStatus`, and fetch a playback URL when `ready`. Learners are directed to **My training** (`/training`). Profile is at `/me`. Use a tenant admin or instructor for library upload (learners cannot list/upload).
+After login, staff land on the **content library** (`/`): list courses/videos, create+upload a file (max **50MB** by default — `UPLOAD_MAX_BYTES`), poll `mediaStatus`, and fetch a playback URL when `ready`. Learners are directed to **My training** (`/training`). Profile is at `/me`. Use a tenant admin or instructor for library upload (learners cannot list/upload).
 
 `/training`: staff assign published ready videos to learners; learners watch, report watch `%` (completion at ≥ 90%), and mark complete; admins see tenant progress/completions. Assignment target is **video** (not course).
 
@@ -94,7 +96,7 @@ In-app notifications (`notifications` table) for assignment, invite, completion,
 - `PATCH /tenants/:id/quotas` — platform admin only
 - Enforcement: invite accept (new membership) and **video create** call `QuotasService` (4xx when at limit)
 
-**Web demo:** `/notifications` inbox; `/org` shows quota usage for tenant admins (instructors see quotas too). Trigger notifications by assigning training, inviting a user, completing a video, or failing worker processing. Platform admin can lower limits via API: `PATCH /tenants/:id/quotas` with `{ "maxUsers": 5, "maxVideos": 2 }`.
+**Web demo:** `/notifications` inbox; `/org` shows quota usage for tenant admins (instructors see quotas too). Trigger notifications by assigning training, inviting a user, completing a video, or failing worker processing. Platform admin can change limits via API: `PATCH /tenants/:id/quotas` with `{ "maxUsers": 5, "maxVideos": 2 }`. Seeded demo tenants default to 20 users / 8 videos.
 
 ### Media storage
 
@@ -106,7 +108,7 @@ Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: l
 
 ### Video upload + Kafka + worker
 
-`POST /videos/:id/upload` accepts multipart field `file`, writes via the storage adapter, sets `mediaStatus` to `queued`, then produces a job to Kafka topic `video.processing` (`KAFKA_VIDEO_TOPIC`; brokers `KAFKA_BROKERS=localhost:29092`). Payload: `{ videoId, tenantId, storageKey }`.
+`POST /videos/:id/upload` accepts multipart field `file` (rejected over `UPLOAD_MAX_BYTES`, default 50 MiB), writes via the storage adapter, sets `mediaStatus` to `queued`, then produces a job to Kafka topic `video.processing` (`KAFKA_VIDEO_TOPIC`; brokers `KAFKA_BROKERS=localhost:29092`). Payload: `{ videoId, tenantId, storageKey }`.
 
 `npm run worker:dev` runs the consumer: it updates the same Postgres (`DATABASE_URL`) via `@academistream/db`, sets `processing`, then either **submits MediaConvert** (`STORAGE_PROVIDER=s3`) and stores `mediaconvert_job_id`, or on **local disk** checks the file exists and sets `ready` + `playback_key`. A worker **poll loop** (`GetJob`, default every 15s) marks AWS jobs `ready` with the transcoded `playback_key` or `failed`. SNS/EventBridge completion is the documented scale path (see `docs/engineering/SCALE_PATH.md`).
 
@@ -160,7 +162,7 @@ See also: `.env.aws.example` for a copy-paste AWS env block.
 
 ## Environments
 
-Config targets: `local`, `uat`, `prod` (see `.env.example`). Prototype hosting: EC2 + Docker for app + Postgres/Kafka/Redis. Scale path: see `docs/engineering/SCALE_PATH.md`.
+Config targets: `local`, `uat`, `prod` (see `.env.example`). Prototype hosting: EC2 + Docker for app + Postgres/Kafka/Redis (Redis backs login rate limits). Scale path: see `docs/engineering/SCALE_PATH.md`.
 
 The refresh_token cookie is HttpOnly and SameSite=Strict.
 Secure is on only when NODE_ENV=production, so local HTTP (localhost) still receives the cookie. In production, serve the API over HTTPS so the cookie is only sent on TLS.

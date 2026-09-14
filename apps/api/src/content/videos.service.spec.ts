@@ -163,6 +163,7 @@ describe('VideosService', () => {
       videoId: 3,
       tenantId: 10,
       storageKey: 'tenants/10/videos/3/source.mp4',
+      action: 'process',
     });
   });
 

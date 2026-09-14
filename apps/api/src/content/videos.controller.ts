@@ -18,6 +18,7 @@ import type { Request } from "express"
 import type { CreateVideoInput, PublishVideoInput, UpdateVideoInput } from "./types"
 import { Roles } from "../auth/roles.decorator"
 import { FileInterceptor } from "@nestjs/platform-express"
+import { resolveUploadMaxBytes } from "../upload/upload-limits"
 
 @Roles('tenant_admin', 'instructor')
 @Controller('videos')
@@ -66,7 +67,11 @@ export class VideosController {
     }
 
     @Post(':id/upload')
-    @UseInterceptors(FileInterceptor('file'))
+    @UseInterceptors(
+        FileInterceptor('file', {
+            limits: { fileSize: resolveUploadMaxBytes() },
+        }),
+    )
     upload(@Param('id') videoId: string, @UploadedFile() file: Express.Multer.File, @Req() req: Request) {
         const tenantId = this.getTenantId(req.user as JwtPayload);
         return this.videosService.uploadVideo(Number(videoId), tenantId, file);

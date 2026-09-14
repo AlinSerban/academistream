@@ -130,6 +130,11 @@ export function LibraryPage() {
       setUploadMessage('Title, course, and file are required.')
       return
     }
+    const maxBytes = 50 * 1024 * 1024
+    if (file.size > maxBytes) {
+      setUploadMessage('File too large. Maximum upload size is 50MB.')
+      return
+    }
     try {
       const video = await createVideo({
         title,
@@ -310,6 +315,9 @@ export function LibraryPage() {
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 required
               />
+              <span className="text-muted mt-1 block text-xs">
+                Max 50MB — keep demo clips short (MediaConvert bills by duration).
+              </span>
             </label>
             <button
               className="btn btn-primary w-fit"

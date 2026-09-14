@@ -12,7 +12,18 @@ const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'Password123!';
 const PLATFORM_EMAIL =
   process.env.SEED_PLATFORM_EMAIL ?? 'platform@academistream.local';
 
+/** Demo-tight defaults — override with SEED_MAX_USERS / SEED_MAX_VIDEOS. */
+const SEED_MAX_USERS = readPositiveInt(process.env.SEED_MAX_USERS, 20);
+const SEED_MAX_VIDEOS = readPositiveInt(process.env.SEED_MAX_VIDEOS, 8);
+
 type MembershipRole = 'tenant_admin' | 'instructor' | 'learner';
+
+function readPositiveInt(raw: string | undefined, fallback: number): number {
+  if (raw == null || raw.trim() === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.floor(n);
+}
 
 async function getOrCreateUser(
   db: ReturnType<typeof drizzle>,
@@ -57,15 +68,24 @@ async function getOrCreateTenant(
     .limit(1);
 
   if (existing[0]) {
-    return existing[0];
+    const [updated] = await db
+      .update(tenants)
+      .set({
+        maxUsers: SEED_MAX_USERS,
+        maxVideos: SEED_MAX_VIDEOS,
+        updatedAt: new Date(),
+      })
+      .where(eq(tenants.id, existing[0].id))
+      .returning();
+    return updated ?? existing[0];
   }
 
   const [created] = await db
     .insert(tenants)
     .values({
       name,
-      maxUsers: 500,
-      maxVideos: 500,
+      maxUsers: SEED_MAX_USERS,
+      maxVideos: SEED_MAX_VIDEOS,
     })
     .returning();
   return created;
@@ -143,10 +163,13 @@ async function main() {
     isPlatformAdmin: true,
   });
 
-  await seedTenant(db, passwordHash, 'Acme', 'acme');
-  await seedTenant(db, passwordHash, 'Globex', 'globex');
+  const acme = await seedTenant(db, passwordHash, 'Acme', 'acme');
+  const globex = await seedTenant(db, passwordHash, 'Globex', 'globex');
 
-  console.log('Seed complete (idempotent; existing emails/tenants were skipped).');
+  console.log('Seed complete (idempotent; existing emails were skipped).');
+  console.log(
+    `Tenant quotas applied: maxUsers=${SEED_MAX_USERS}, maxVideos=${SEED_MAX_VIDEOS} (Acme #${acme.id}, Globex #${globex.id}).`,
+  );
   console.log(`Platform admin: ${PLATFORM_EMAIL}`);
   console.log('Tenant admins: admin@acme.local, admin@globex.local');
   console.log('Also seeded instructor + learner per tenant.');

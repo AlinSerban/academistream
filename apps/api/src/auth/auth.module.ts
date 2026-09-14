@@ -9,6 +9,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwtStrategy } from './jwt.strategy';
 import { PassportModule } from '@nestjs/passport';
 import { RolesGuard } from './roles.guard';
+import { LoginRateLimitService } from './login-rate-limit.service';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RolesGuard } from './roles.guard';
   ],
   providers: [
     AuthService,
+    LoginRateLimitService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard

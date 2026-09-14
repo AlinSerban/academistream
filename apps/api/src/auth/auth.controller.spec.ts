@@ -1,11 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { LoginRateLimitService } from './login-rate-limit.service';
 import type { Response, Request } from 'express';
 
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: { signIn: jest.Mock, refresh: jest.Mock, signOut: jest.Mock, getMe: jest.Mock };
+  let loginRateLimit: { assertAllowed: jest.Mock };
 
   beforeEach(async () => {
     authService = {
@@ -14,6 +16,7 @@ describe('AuthController', () => {
       signOut: jest.fn(),
       getMe: jest.fn()
     }
+    loginRateLimit = { assertAllowed: jest.fn().mockResolvedValue(undefined) }
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -21,22 +24,28 @@ describe('AuthController', () => {
         {
           provide: AuthService,
           useValue: authService
-        }
+        },
+        {
+          provide: LoginRateLimitService,
+          useValue: loginRateLimit,
+        },
       ]
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
   });
 
-  it('calls signIn with email, password and res', async () => {
+  it('calls signIn with email, password and res after rate-limit check', async () => {
     const body = { email: 'a@b.com', password: 'secret' };
+    const req = { ip: '127.0.0.1', headers: {}, socket: {} } as unknown as Request;
     const res = {} as Response;
     const expected = { access_token: 'token' };
 
     authService.signIn.mockResolvedValue(expected);
 
-    const result = await controller.signIn(body, res);
+    const result = await controller.signIn(body, req, res);
 
+    expect(loginRateLimit.assertAllowed).toHaveBeenCalledWith('127.0.0.1', 'a@b.com');
     expect(authService.signIn).toHaveBeenCalledWith('a@b.com', 'secret', res);
     expect(result).toEqual(expected);
   });

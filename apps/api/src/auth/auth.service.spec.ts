@@ -11,12 +11,17 @@ import bcrypt from 'bcrypt';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersService: { findUser: jest.Mock; findMembershipsByUserId: jest.Mock };
+  let usersService: {
+    findUser: jest.Mock
+    findUserById: jest.Mock
+    findMembershipsByUserId: jest.Mock
+  };
   let jwtService: { signAsync: jest.Mock, verifyAsync: jest.Mock }
 
   beforeEach(async () => {
     usersService = {
       findUser: jest.fn(),
+      findUserById: jest.fn(),
       findMembershipsByUserId: jest.fn(),
     };
     jwtService = {
@@ -103,6 +108,15 @@ describe('AuthService', () => {
       isPlatformAdmin: false,
       roles: [{ tenantId: 10, role: 'instructor' }],
     });
+    usersService.findUserById.mockResolvedValue({
+      id: 1,
+      name: 'John',
+      email: 'a@b.com',
+      isPlatformAdmin: false,
+    });
+    usersService.findMembershipsByUserId.mockResolvedValue([
+      { tenantId: 10, role: 'instructor' },
+    ]);
     jwtService.signAsync.mockResolvedValue('new-access-token');
 
     await expect(service.refresh('refresh-token')).resolves.toEqual({

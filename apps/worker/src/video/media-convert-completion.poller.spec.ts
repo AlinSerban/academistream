@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DRIZZLE } from '../db/db.module';
+import { KafkaProducerService } from '../kafka/kafka.producer';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { MediaConvertService } from './media-convert.service';
 import { MediaConvertCompletionPoller } from './media-convert-completion.poller';
@@ -9,6 +10,7 @@ describe('MediaConvertCompletionPoller', () => {
     let poller: MediaConvertCompletionPoller;
     let db: { select: jest.Mock; update: jest.Mock };
     let notifications: { notifyTenantStaff: jest.Mock };
+    let kafka: { sendMediaEventProcessingJob: jest.Mock };
     let mediaConvert: {
         getJob: jest.Mock;
         getPlaybackKeyFromJob: jest.Mock;
@@ -17,6 +19,9 @@ describe('MediaConvertCompletionPoller', () => {
     beforeEach(async () => {
         db = { select: jest.fn(), update: jest.fn() };
         notifications = { notifyTenantStaff: jest.fn().mockResolvedValue(undefined) };
+        kafka = {
+            sendMediaEventProcessingJob: jest.fn().mockResolvedValue(undefined),
+        };
         mediaConvert = {
             getJob: jest.fn(),
             getPlaybackKeyFromJob: jest.fn(),
@@ -39,6 +44,7 @@ describe('MediaConvertCompletionPoller', () => {
                     },
                 },
                 { provide: NotificationsService, useValue: notifications },
+                { provide: KafkaProducerService, useValue: kafka },
             ],
         }).compile();
 
@@ -67,7 +73,12 @@ describe('MediaConvertCompletionPoller', () => {
             'tenants/10/videos/3/output/source.mp4',
         );
 
-        const returning = jest.fn().mockResolvedValue([{ id: 3, mediaStatus: 'ready' }]);
+        const returning = jest.fn().mockResolvedValue([{
+            id: 3,
+            tenantId: 10,
+            mediaStatus: 'ready',
+            mediaFailureReason: null,
+        }]);
         const where = jest.fn().mockReturnValue({ returning });
         const set = jest.fn().mockReturnValue({ where });
         db.update.mockReturnValue({ set });
@@ -80,10 +91,16 @@ describe('MediaConvertCompletionPoller', () => {
                 playbackKey: 'tenants/10/videos/3/output/source.mp4',
             }),
         );
+        expect(kafka.sendMediaEventProcessingJob).toHaveBeenCalledWith({
+            videoId: 3,
+            tenantId: 10,
+            status: 'ready',
+            reason: null,
+        });
         expect(notifications.notifyTenantStaff).not.toHaveBeenCalled();
     });
 
-    it('marks failed and notifies when job errors', async () => {
+    it('marks failed and publishes media event when job errors', async () => {
         db.select.mockReturnValue({
             from: jest.fn().mockReturnValue({
                 where: jest.fn().mockResolvedValue([{
@@ -101,18 +118,24 @@ describe('MediaConvertCompletionPoller', () => {
             ErrorMessage: 'Invalid selector_sequence_id [0] specified for audio_description [1].',
         });
 
-        const returning = jest.fn().mockResolvedValue([{ id: 3, mediaStatus: 'failed' }]);
+        const returning = jest.fn().mockResolvedValue([{
+            id: 3,
+            tenantId: 10,
+            mediaStatus: 'failed',
+            mediaFailureReason: 'MediaConvert job ERROR (1040): Invalid selector_sequence_id [0] specified for audio_description [1].',
+        }]);
         const where = jest.fn().mockReturnValue({ returning });
         db.update.mockReturnValue({ set: jest.fn().mockReturnValue({ where }) });
 
         await poller.poll();
 
-        expect(notifications.notifyTenantStaff).toHaveBeenCalledWith({
+        expect(kafka.sendMediaEventProcessingJob).toHaveBeenCalledWith({
+            videoId: 3,
             tenantId: 10,
-            type: 'video.media_failed',
-            title: 'Video processing failed',
-            body: 'Processing failed for: Clip',
+            status: 'failed',
+            reason: 'MediaConvert job ERROR (1040): Invalid selector_sequence_id [0] specified for audio_description [1].',
         });
+        expect(notifications.notifyTenantStaff).not.toHaveBeenCalled();
     });
 
     it('is idempotent when video already left processing state', async () => {
@@ -128,7 +151,7 @@ describe('MediaConvertCompletionPoller', () => {
         });
 
         mediaConvert.getJob.mockResolvedValue({ Status: 'COMPLETE' });
-        mediaConvert.getPlaybackKeyFromJob.mockResolvedValue('tenants/10/videos/3/output/a.mp4');
+        mediaConvert.getPlaybackKeyFromJob.mockReturnValue('tenants/10/videos/3/output/a.mp4');
 
         const returning = jest.fn().mockResolvedValue([]);
         db.update.mockReturnValue({
@@ -139,6 +162,7 @@ describe('MediaConvertCompletionPoller', () => {
 
         await poller.poll();
 
+        expect(kafka.sendMediaEventProcessingJob).not.toHaveBeenCalled();
         expect(notifications.notifyTenantStaff).not.toHaveBeenCalled();
     });
 });

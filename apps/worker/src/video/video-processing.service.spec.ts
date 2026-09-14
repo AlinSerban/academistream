@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { access } from 'fs/promises';
 import { DRIZZLE } from '../db/db.module';
+import { KafkaProducerService } from '../kafka/kafka.producer';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { MediaConvertService } from './media-convert.service';
 import { VideoProcessingService } from './video-processing.service';
@@ -14,6 +15,7 @@ describe('VideoProcessingService', () => {
     let service: VideoProcessingService;
     let db: { select: jest.Mock; update: jest.Mock };
     let notifications: { notifyTenantStaff: jest.Mock };
+    let kafka: { sendMediaEventProcessingJob: jest.Mock };
     let configGet: jest.Mock;
     let mediaConvert: { submitTranscodeJob: jest.Mock };
 
@@ -21,6 +23,9 @@ describe('VideoProcessingService', () => {
         db = { select: jest.fn(), update: jest.fn() };
         notifications = {
             notifyTenantStaff: jest.fn().mockResolvedValue(undefined),
+        };
+        kafka = {
+            sendMediaEventProcessingJob: jest.fn().mockResolvedValue(undefined),
         };
         configGet = jest.fn().mockReturnValue(undefined);
         mediaConvert = { submitTranscodeJob: jest.fn() };
@@ -34,6 +39,7 @@ describe('VideoProcessingService', () => {
                     useValue: { get: configGet },
                 },
                 { provide: NotificationsService, useValue: notifications },
+                { provide: KafkaProducerService, useValue: kafka },
             ],
         }).compile();
 
@@ -59,7 +65,11 @@ describe('VideoProcessingService', () => {
         });
     }
 
-    it('notifies tenant staff when local processing fails', async () => {
+    function kafkaProvider() {
+        return { provide: KafkaProducerService, useValue: kafka };
+    }
+
+    it('publishes media failed event when local processing fails', async () => {
         jest.mocked(access).mockRejectedValue(new Error('ENOENT'));
         mockVideoLookup({
             id: 3,
@@ -74,14 +84,16 @@ describe('VideoProcessingService', () => {
             videoId: 3,
             tenantId: 10,
             storageKey: 'tenants/10/videos/3/missing.mp4',
+            action: 'process',
         });
 
-        expect(notifications.notifyTenantStaff).toHaveBeenCalledWith({
+        expect(kafka.sendMediaEventProcessingJob).toHaveBeenCalledWith({
+            videoId: 3,
             tenantId: 10,
-            type: 'video.media_failed',
-            title: 'Video processing failed',
-            body: 'Processing failed for: Safety 101',
+            status: 'failed',
+            reason: 'Processing setup failed',
         });
+        expect(notifications.notifyTenantStaff).not.toHaveBeenCalled();
     });
 
     it('marks local file ready with playback key when source exists', async () => {
@@ -109,6 +121,7 @@ describe('VideoProcessingService', () => {
             videoId: 3,
             tenantId: 10,
             storageKey: 'tenants/10/videos/3/source.mp4',
+            action: 'process',
         });
 
         expect(setProcessing).toHaveBeenCalledWith(
@@ -136,6 +149,7 @@ describe('VideoProcessingService', () => {
             videoId: 3,
             tenantId: 10,
             storageKey: 'tenants/10/videos/3/source.mp4',
+            action: 'process',
         });
 
         expect(db.update).not.toHaveBeenCalled();
@@ -159,6 +173,7 @@ describe('VideoProcessingService', () => {
                 { provide: DRIZZLE, useValue: db },
                 { provide: ConfigService, useValue: { get: configGet } },
                 { provide: NotificationsService, useValue: notifications },
+                kafkaProvider(),
             ],
         }).compile();
 
@@ -188,6 +203,7 @@ describe('VideoProcessingService', () => {
             videoId: 3,
             tenantId: 10,
             storageKey: 'tenants/10/videos/3/source.mp4',
+            action: 'process',
         });
 
         expect(mediaConvert.submitTranscodeJob).toHaveBeenCalledWith(
@@ -217,6 +233,7 @@ describe('VideoProcessingService', () => {
                 { provide: DRIZZLE, useValue: db },
                 { provide: ConfigService, useValue: { get: configGet } },
                 { provide: NotificationsService, useValue: notifications },
+                kafkaProvider(),
             ],
         }).compile();
 
@@ -239,9 +256,34 @@ describe('VideoProcessingService', () => {
             videoId: 3,
             tenantId: 10,
             storageKey: 'tenants/10/videos/3/source.mp4',
+            action: 'process',
         });
 
         expect(mediaConvert.submitTranscodeJob).not.toHaveBeenCalled();
         expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('notifies tenant staff when media event status is failed', async () => {
+        mockVideoLookup({
+            id: 3,
+            tenantId: 10,
+            title: 'Safety 101',
+            mediaStatus: 'failed',
+            mediaConvertJobId: null,
+        });
+
+        await service.handleEvents({
+            videoId: 3,
+            tenantId: 10,
+            status: 'failed',
+            reason: 'Processing setup failed',
+        });
+
+        expect(notifications.notifyTenantStaff).toHaveBeenCalledWith({
+            tenantId: 10,
+            type: 'video.media_failed',
+            title: 'Video processing failed',
+            body: 'Processing failed for: Safety 101; reason: Processing setup failed',
+        });
     });
 });

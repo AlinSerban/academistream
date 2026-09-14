@@ -2,17 +2,26 @@ import { Body, Controller, HttpCode, HttpStatus, Post, Res, Req, Get } from '@ne
 import { AuthService } from './auth.service';
 import type { Response, Request } from 'express';
 import { Public } from './public.decorator';
-import { JwtPayload } from './types';
+import { LoginRateLimitService } from './login-rate-limit.service';
 
 @Controller('auth')
 export class AuthController {
-    constructor(private readonly authService: AuthService) { }
+    constructor(
+        private readonly authService: AuthService,
+        private readonly loginRateLimit: LoginRateLimitService,
+    ) { }
 
     @HttpCode(HttpStatus.OK)
     @Public()
     @Post('login')
-    signIn(@Body() signInDto: Record<string, any>, @Res({ passthrough: true }) res: Response) {
-        return this.authService.signIn(signInDto.email, signInDto.password, res);
+    async signIn(
+        @Body() signInDto: Record<string, any>,
+        @Req() req: Request,
+        @Res({ passthrough: true }) res: Response,
+    ) {
+        const email = String(signInDto.email ?? '')
+        await this.loginRateLimit.assertAllowed(clientIp(req), email)
+        return this.authService.signIn(email, signInDto.password, res);
     }
 
     @Public()
@@ -33,4 +42,12 @@ export class AuthController {
         return this.authService.getMe(user.sub);
     }
 
+}
+
+function clientIp(req: Request): string {
+    const forwarded = req.headers['x-forwarded-for']
+    if (typeof forwarded === 'string' && forwarded.length > 0) {
+        return forwarded.split(',')[0]?.trim() || req.ip || 'unknown'
+    }
+    return req.ip || req.socket.remoteAddress || 'unknown'
 }
