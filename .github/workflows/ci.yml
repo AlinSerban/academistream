@@ -9,6 +9,42 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: academistream
+          POSTGRES_PASSWORD: academistream
+          POSTGRES_DB: academistream
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U academistream -d academistream"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://academistream:academistream@localhost:5432/academistream
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: secret
+      STORAGE_PROVIDER: local
+      STORAGE_LOCAL_ROOT: .data/media-ci
+      SEED_PASSWORD: Password123!
+      SEED_MAX_USERS: "20"
+      SEED_MAX_VIDEOS: "8"
+      WEB_ORIGIN: http://localhost:5173
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -22,11 +58,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Test API
+      - name: Migrate database
+        run: npm run db:migrate
+
+      - name: Seed database
+        run: npm run db:seed
+
+      - name: Test API (unit)
         run: npm test -w @academistream/api
 
-      - name: Test Worker
+      - name: Test Worker (unit)
         run: npm test -w @academistream/worker
+
+      - name: API integration (Postgres)
+        run: npm run test:integration -w @academistream/api
+
+      - name: Demo script e2e (HTTP, Kafka mocked)
+        run: npm run test:demo-e2e -w @academistream/api
 
       - name: Build Web
         run: npm run build -w @academistream/web

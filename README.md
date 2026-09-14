@@ -56,7 +56,7 @@ Auth and isolation tests are **unit tests with Jest mocks** — no real Postgres
 | RolesGuard | Instantiate guard with mocked `Reflector`; fake `ExecutionContext` + JWT payload |
 | Tenant isolation | Controller uses JWT `roles[].tenantId` (Acme ≠ Globex); service `getMe(tenantId)` with mocked Drizzle |
 
-Run: `npm test -w @academistream/api` (also in CI). Integration / Supertest against a real database is a documented next step, not required for current CI.
+Run: `npm test -w @academistream/api` (also in CI). Integration / demo e2e against real Postgres (Kafka mocked) run as `npm run test:integration` and `npm run test:demo-e2e` — CI starts Postgres + Redis, migrates, and seeds first.
 
 Seed is idempotent (re-run skips existing emails). Seed tenants get demo-tight quotas by default (`SEED_MAX_USERS=20`, `SEED_MAX_VIDEOS=8`) and those limits are **re-applied** on each seed. Dev accounts (password from `SEED_PASSWORD` in `.env`, default `Password123!`):
 

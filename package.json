@@ -13,6 +13,8 @@
     "worker:build": "npm run build -w @academistream/worker",
     "web:build": "npm run build -w @academistream/web",
     "test": "npm run test -w @academistream/api -w @academistream/worker",
+    "test:integration": "npm run test:integration -w @academistream/api",
+    "test:demo-e2e": "npm run test:demo-e2e -w @academistream/api",
     "db:generate": "npm run db:generate -w @academistream/api",
     "db:migrate": "npm run db:migrate -w @academistream/api",
     "db:seed": "npm run db:seed -w @academistream/api",
