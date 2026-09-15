@@ -14,6 +14,10 @@ coverage
 .turbo
 .data/
 
+# Cloudflare Wrangler local state
+infra/wake-worker/.wrangler/
+infra/wake-worker/node_modules/
+
 # Terraform
 infra/terraform/.terraform/
 infra/terraform/*.tfstate

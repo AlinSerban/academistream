@@ -160,6 +160,27 @@ The library page (`/`) polls video list every **2 seconds** while any video is `
 
 See also: `.env.aws.example` for a copy-paste AWS env block.
 
+## Hosted demo
+
+**URL:** https://academistream.online  
+
+B2B training-video demo on **EC2 t3.small** (eu-central-1) + Docker Compose + Caddy HTTPS.
+
+| | |
+|--|--|
+| Cold start | If the VM was idle, first load shows “Starting the demo…” (~1–2 min), then the app |
+| Auto-stop | Hourly check stops EC2 when there was no page visit for **30 minutes** |
+| Media | Local disk on the instance (S3 optional; see AWS path above) |
+| Cost | Pay compute only while running; keep the **Elastic IP**; EBS still bills when stopped |
+
+**Demo logins** (seed only — not production): password `Password123!`
+
+- Acme admin: `admin@acme.local`
+- Acme instructor: `instructor@acme.local`
+- Acme learner: `learner@acme.local`
+
+Wake Worker setup: `infra/wake-worker/README.md`.
+
 ## Environments
 
 Config targets: `local`, `uat`, `prod` (see `.env.example`). Prototype hosting: EC2 + Docker for app + Postgres/Kafka/Redis (Redis backs login rate limits). Scale path: see `docs/engineering/SCALE_PATH.md`.
