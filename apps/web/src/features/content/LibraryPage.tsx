@@ -8,6 +8,8 @@ import {
   PaginationControls,
   slicePage,
 } from '../../components/PaginationControls'
+import { VideoPlayerModal } from '../../components/VideoPlayerModal'
+import { useToast } from '../../components/Toast'
 import { useMeQuery } from '../auth/authApi'
 import {
   useCreateCourseMutation,
@@ -15,9 +17,10 @@ import {
   useGetCoursesQuery,
   useGetVideosQuery,
   useLazyGetPlaybackUrlQuery,
+  usePublishVideoMutation,
   useUploadVideoMutation,
 } from './contentApi'
-import type { Video } from './types'
+import type { PublishState, Video } from './types'
 
 const COURSE_PAGE_SIZE = 5
 const VIDEO_PAGE_SIZE = 5
@@ -71,12 +74,17 @@ export function LibraryPage() {
   const [videoPage, setVideoPage] = useState(1)
   const [createVideo, createVideoState] = useCreateVideoMutation()
   const [uploadVideo, uploadVideoState] = useUploadVideoMutation()
-  const [uploadMessage, setUploadMessage] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   const [fetchPlayback, playbackState] = useLazyGetPlaybackUrlQuery()
   const [playbackByVideoId, setPlaybackByVideoId] = useState<
     Record<number, string>
   >({})
+  const [watchTarget, setWatchTarget] = useState<{
+    videoId: number
+    title: string
+    courseTitle: string
+  } | null>(null)
 
   const filteredCourses = useMemo(() => {
     const q = courseQuery.trim().toLowerCase()
@@ -123,16 +131,21 @@ export function LibraryPage() {
 
   async function onCreateAndUpload(event: FormEvent) {
     event.preventDefault()
-    setUploadMessage(null)
     const title = videoTitle.trim()
     const parsedCourseId = Number(courseId)
     if (!title || !parsedCourseId || !file) {
-      setUploadMessage('Title, course, and file are required.')
+      showToast({
+        message: 'Title, course, and file are required.',
+        tone: 'error',
+      })
       return
     }
     const maxBytes = 50 * 1024 * 1024
     if (file.size > maxBytes) {
-      setUploadMessage('File too large. Maximum upload size is 50MB.')
+      showToast({
+        message: 'File too large. Maximum upload size is 50MB.',
+        tone: 'error',
+      })
       return
     }
     try {
@@ -143,27 +156,33 @@ export function LibraryPage() {
       await uploadVideo({ videoId: video.id, file }).unwrap()
       setVideoTitle('')
       setFile(null)
-      setUploadMessage(`Uploaded “${video.title}” — waiting for processing…`)
+      showToast({
+        message: `Uploaded "${video.title}". Waiting for processing…`,
+        tone: 'success',
+      })
       setPollMs(2000)
     } catch {
-      setUploadMessage('Create or upload failed.')
+      showToast({ message: 'Create or upload failed.', tone: 'error' })
     }
   }
 
-  async function onPlayback(videoId: number) {
+  async function onPlayback(video: Video, courseTitle: string) {
+    setWatchTarget({
+      videoId: video.id,
+      title: video.title,
+      courseTitle,
+    })
     try {
-      const result = await fetchPlayback(videoId).unwrap()
-      setPlaybackByVideoId((prev) => ({ ...prev, [videoId]: result.url }))
+      const result = await fetchPlayback(video.id).unwrap()
+      setPlaybackByVideoId((prev) => ({ ...prev, [video.id]: result.url }))
     } catch {
-      // shown via playbackState
+      // shown via playbackState / modal error
     }
   }
 
-  const expandedVideoId =
-    playbackState.originalArgs ??
-    (Object.keys(playbackByVideoId).length > 0
-      ? Number(Object.keys(playbackByVideoId).at(-1))
-      : null)
+  function closeWatch() {
+    setWatchTarget(null)
+  }
 
   if (isLearner) {
     return <Navigate to="/training" replace />
@@ -173,7 +192,7 @@ export function LibraryPage() {
     <>
       <PageHeader
         title="Content library"
-        subtitle={me ? `Courses and videos · ${me.email}` : 'Courses and videos'}
+        subtitle={me ? `${me.email}` : undefined}
       />
 
       <section className="panel">
@@ -306,19 +325,27 @@ export function LibraryPage() {
                 ))}
               </select>
             </label>
-            <label className="field-label">
+            <div className="field-label">
               File
-              <input
-                className="text-sm"
-                type="file"
-                accept="video/*,.mp4"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                required
-              />
-              <span className="text-muted mt-1 block text-xs">
-                Max 50MB — keep demo clips short (MediaConvert bills by duration).
+              <label className="file-picker">
+                <input
+                  className="file-picker-input"
+                  type="file"
+                  accept="video/*,.mp4"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  required
+                />
+                <span className="btn btn-secondary file-picker-btn" aria-hidden="true">
+                  Choose file
+                </span>
+                <span className="file-picker-name">
+                  {file ? file.name : 'No file selected'}
+                </span>
+              </label>
+              <span className="text-muted text-xs">
+                Maximum upload size is 50MB.
               </span>
-            </label>
+            </div>
             <button
               className="btn btn-primary w-fit"
               type="submit"
@@ -333,22 +360,40 @@ export function LibraryPage() {
                 : 'Create & upload'}
             </button>
           </form>
-          {uploadMessage ? (
-            <p className="alert-info mt-3 text-sm">{uploadMessage}</p>
-          ) : null}
         </div>
       </section>
 
       <section className="panel">
         <header className="panel-head">
           <h2 className="panel-title">Videos</h2>
-          {!videosLoading && !videosError && videos.length > 0 ? (
-            <span className="panel-count">
-              {videoStatusFilter !== 'all'
-                ? `${filteredVideos.length} of ${videos.length}`
-                : `${videos.length} ${videos.length === 1 ? 'video' : 'videos'}`}
-            </span>
-          ) : null}
+          <div className="panel-head-tools">
+            {!videosLoading && !videosError && videos.length > 0 ? (
+              <span className="panel-count">
+                {videoStatusFilter !== 'all'
+                  ? `${filteredVideos.length} of ${videos.length}`
+                  : `${videos.length} ${videos.length === 1 ? 'video' : 'videos'}`}
+              </span>
+            ) : null}
+            {!videosLoading && !videosError && videos.length > 0 ? (
+              <>
+                <label className="sr-only" htmlFor="video-status-filter">
+                  Media status
+                </label>
+                <select
+                  id="video-status-filter"
+                  className="select table-compact-select"
+                  value={videoStatusFilter}
+                  onChange={(e) => setVideoStatusFilter(e.target.value)}
+                >
+                  <option value="all">All media</option>
+                  <option value="queued">Queued</option>
+                  <option value="processing">Processing</option>
+                  <option value="ready">Ready</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </>
+            ) : null}
+          </div>
         </header>
 
         {videosLoading ? (
@@ -367,24 +412,8 @@ export function LibraryPage() {
                   <th className="col-id">ID</th>
                   <th>Title</th>
                   <th>Course</th>
-                  <th className="col-search">
-                    <label className="sr-only" htmlFor="video-status-filter">
-                      Media status
-                    </label>
-                    <select
-                      id="video-status-filter"
-                      className="select"
-                      value={videoStatusFilter}
-                      onChange={(e) => setVideoStatusFilter(e.target.value)}
-                    >
-                      <option value="all">All statuses</option>
-                      <option value="queued">Queued</option>
-                      <option value="processing">Processing</option>
-                      <option value="ready">Ready</option>
-                      <option value="failed">Failed</option>
-                    </select>
-                  </th>
-                  <th>Publish</th>
+                  <th className="col-media">Media</th>
+                  <th className="col-visibility">Visibility</th>
                   <th className="col-actions">
                     <span className="sr-only">Actions</span>
                   </th>
@@ -398,30 +427,23 @@ export function LibraryPage() {
                     </td>
                   </tr>
                 ) : (
-                  pagedVideos.map((video) => (
-                    <VideoTableRow
-                      key={video.id}
-                      video={video}
-                      courseTitle={
-                        courseTitleById.get(video.courseId) ??
-                        `Course ${video.courseId}`
-                      }
-                      playbackUrl={playbackByVideoId[video.id]}
-                      isFetchingPlayback={
-                        playbackState.isFetching &&
-                        playbackState.originalArgs === video.id
-                      }
-                      playbackError={
-                        playbackState.isError &&
-                        playbackState.originalArgs === video.id
-                      }
-                      showPlayer={
-                        expandedVideoId === video.id &&
-                        playbackByVideoId[video.id] != null
-                      }
-                      onPlayback={() => void onPlayback(video.id)}
-                    />
-                  ))
+                  pagedVideos.map((video) => {
+                    const courseTitle =
+                      courseTitleById.get(video.courseId) ??
+                      `Course ${video.courseId}`
+                    return (
+                      <VideoTableRow
+                        key={video.id}
+                        video={video}
+                        courseTitle={courseTitle}
+                        isFetchingPlayback={
+                          playbackState.isFetching &&
+                          playbackState.originalArgs === video.id
+                        }
+                        onPlayback={() => void onPlayback(video, courseTitle)}
+                      />
+                    )
+                  })
                 )}
               </tbody>
             </table>
@@ -435,6 +457,25 @@ export function LibraryPage() {
           </>
         )}
       </section>
+
+      {watchTarget ? (
+        <VideoPlayerModal
+          title={watchTarget.title}
+          subtitle={watchTarget.courseTitle}
+          playbackUrl={playbackByVideoId[watchTarget.videoId] ?? null}
+          isLoading={
+            playbackState.isFetching &&
+            playbackState.originalArgs === watchTarget.videoId
+          }
+          error={
+            playbackState.isError &&
+            playbackState.originalArgs === watchTarget.videoId
+              ? 'Could not get playback URL.'
+              : null
+          }
+          onClose={closeWatch}
+        />
+      ) : null}
     </>
   )
 }
@@ -442,85 +483,78 @@ export function LibraryPage() {
 function VideoTableRow({
   video,
   courseTitle,
-  playbackUrl,
   isFetchingPlayback,
-  playbackError,
-  showPlayer,
   onPlayback,
 }: {
   video: Video
   courseTitle: string
-  playbackUrl?: string
   isFetchingPlayback: boolean
-  playbackError: boolean
-  showPlayer: boolean
   onPlayback: () => void
 }) {
-  const playableInBrowser = playbackUrl != null && isBrowserPlayableUrl(playbackUrl)
+  const [publishVideo, publishState] = usePublishVideoMutation()
+  const isPublished = video.publishState === 'published'
+
+  async function onVisibilityChange(next: PublishState) {
+    if (next === video.publishState) return
+    try {
+      await publishVideo({
+        videoId: video.id,
+        publishState: next,
+      }).unwrap()
+    } catch {
+      // list refresh / error via RTK; keep row usable
+    }
+  }
 
   return (
-    <>
-      <tr>
-        <td className="col-id cell-id">{video.id}</td>
-        <td className="cell-primary">{video.title}</td>
-        <td className="cell-secondary">{courseTitle}</td>
-        <td>
-          <MediaStatusBadge status={video.mediaStatus} />
-        </td>
-        <td className="cell-secondary">{video.publishState}</td>
-        <td className="col-actions">
-          {video.mediaStatus === 'ready' ? (
-            <button
-              className="link-accent cursor-pointer border-0 bg-transparent p-0 text-sm"
-              type="button"
-              disabled={isFetchingPlayback}
-              onClick={onPlayback}
-            >
-              {isFetchingPlayback ? 'Loading…' : playbackUrl ? 'Reload' : 'Play'}
-            </button>
-          ) : video.mediaStatus === 'failed' ? (
-            <Link className="link-accent text-sm" to="/notifications">
-              Details
-            </Link>
-          ) : (
-            <span className="cell-secondary">—</span>
-          )}
-        </td>
-      </tr>
-      {showPlayer && video.mediaStatus === 'ready' ? (
-        <tr className="row-expand">
-          <td colSpan={6}>
-            {playableInBrowser ? (
-              <video
-                className="playback-frame"
-                controls
-                preload="metadata"
-                src={playbackUrl}
-              >
-                Your browser does not support inline video playback.
-              </video>
-            ) : playbackUrl ? (
-              <p className="text-muted text-xs">
-                Inline playback needs HTTPS. Local file URLs:{' '}
-                <a className="link-accent break-all" href={playbackUrl}>
-                  {playbackUrl}
-                </a>
-              </p>
-            ) : null}
-            {playbackError ? (
-              <p className="alert-error mt-2" role="alert">
-                Could not get playback URL.
-              </p>
-            ) : null}
-          </td>
-        </tr>
-      ) : null}
-    </>
+    <tr>
+      <td className="col-id cell-id">{video.id}</td>
+      <td className="cell-primary">{video.title}</td>
+      <td className="cell-secondary">{courseTitle}</td>
+      <td className="col-media">
+        <MediaStatusBadge status={video.mediaStatus} />
+      </td>
+      <td className="col-visibility">
+        <label className="sr-only" htmlFor={`visibility-${video.id}`}>
+          Visibility
+        </label>
+        <select
+          id={`visibility-${video.id}`}
+          className={
+            isPublished
+              ? 'select visibility-select is-published'
+              : 'select visibility-select'
+          }
+          value={video.publishState}
+          disabled={publishState.isLoading}
+          onChange={(e) =>
+            void onVisibilityChange(e.target.value as PublishState)
+          }
+        >
+          <option value="draft">Draft</option>
+          <option value="published">Published</option>
+        </select>
+      </td>
+      <td className="col-actions">
+        {video.mediaStatus === 'ready' ? (
+          <button
+            className="btn btn-secondary btn-sm"
+            type="button"
+            disabled={isFetchingPlayback}
+            onClick={onPlayback}
+          >
+            {isFetchingPlayback ? 'Loading…' : 'Play'}
+          </button>
+        ) : video.mediaStatus === 'failed' ? (
+          <Link className="link-accent text-sm" to="/notifications">
+            Details
+          </Link>
+        ) : (
+          <span className="cell-secondary">-</span>
+        )}
+      </td>
+    </tr>
   )
-}
-
-function isBrowserPlayableUrl(url: string): boolean {
-  return url.startsWith('http://') || url.startsWith('https://')
 }
 
 function getListErrorMessage(

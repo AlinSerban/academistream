@@ -8,14 +8,23 @@ When someone opens `https://academistream.online` and the EC2 demo is **stopped*
 
 If EC2 is already running, traffic is proxied to the instance (Elastic IP).
 
-**Auto-stop (hourly):** Cloudflare cron runs at **:00 UTC** each hour and:
+**Auto-stop (GitHub Actions):** workflow `.github/workflows/demo-idle-stop.yml` runs every **20 minutes** and calls `GET /__wake/idle-tick`:
 
-1. Checks EC2 state — if **not running**, do nothing  
-2. If **running**, checks last **page navigation** time (SPA/API polls do not count)  
-3. Visited within the last **30 minutes** → leave running  
-4. No visit in 30+ minutes → `StopInstances`
+1. Checks EC2 state - if **not running**, do nothing
+2. If **running**, checks last **page navigation** time (SPA/API polls do not count)
+3. Visited within the last **20 minutes** → leave running
+4. No visit in 20+ minutes (or no `lastSeen` in KV) → `StopInstances`
 
-Optional: `GET /__wake/idle-tick` with `Authorization: Bearer <IDLE_TICK_SECRET>` runs the same check manually (debug).
+`lastSeen` KV writes are throttled (at most once per 5 minutes) to stay under the Workers KV free tier.
+
+## Secrets (required for auto-stop)
+
+Same random string in both places:
+
+1. Cloudflare Worker: `npx wrangler secret put IDLE_TICK_SECRET`
+2. GitHub repo → Settings → Secrets → Actions → `WAKE_IDLE_TICK_SECRET`
+
+Until both are set, idle-tick returns 401 and the scheduled workflow fails (EC2 will not auto-stop).
 
 ## One-time AWS setup (IAM)
 
@@ -49,6 +58,7 @@ Current defaults in `wrangler.toml`:
 | `EC2_INSTANCE_ID` | `i-0c8e42174984f3d6c` |
 | `AWS_REGION` | `eu-central-1` |
 | `ORIGIN_IP` | `3.69.93.245` |
+| `IDLE_STOP_MINUTES` | `20` |
 
 If the IP changes: update Cloudflare DNS **and** `ORIGIN_IP` in `wrangler.toml`, then redeploy.
 
@@ -60,6 +70,7 @@ npm install
 npx wrangler login
 npx wrangler secret put AWS_ACCESS_KEY_ID
 npx wrangler secret put AWS_SECRET_ACCESS_KEY
+npx wrangler secret put IDLE_TICK_SECRET
 npx wrangler deploy
 ```
 
@@ -90,7 +101,7 @@ After proxy is on: stop the EC2 instance, open `https://academistream.online`, c
 
 ## Cost notes
 
-- Worker: free-tier friendly for demo traffic
+- Worker: free-tier friendly for demo traffic (KV writes throttled)
 - EC2: pay only while **running**; stop when idle (Worker will start it again on next visit)
 - Elastic IP: keep associated (small idle charge is fine vs broken wake)
 - EBS: still billed while stopped
@@ -104,3 +115,10 @@ npx wrangler dev
 ## Ops
 
 After deploy, stop the instance and open `https://academistream.online` — you should see the starting page, then the app after ~1–2 minutes.
+
+Manual idle check (same as GHA):
+
+```bash
+curl -fsS -H "Authorization: Bearer $IDLE_TICK_SECRET" \
+  https://academistream.online/__wake/idle-tick
+```

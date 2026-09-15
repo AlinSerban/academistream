@@ -7,9 +7,9 @@ export interface Env {
   EC2_INSTANCE_ID: string
   ORIGIN_IP: string
   WAKE_KV: KVNamespace
-  /** Minutes without a page visit before StopInstances (default 30). */
+  /** Minutes without a page visit before StopInstances (default 20). */
   IDLE_STOP_MINUTES?: string
-  /** Optional shared secret for manual GET /__wake/idle-tick. */
+  /** Shared secret for GET /__wake/idle-tick (GitHub Actions + manual). */
   IDLE_TICK_SECRET?: string
 }
 
@@ -18,15 +18,16 @@ const STATUS_PATH = '/__wake/status'
 const IDLE_TICK_PATH = '/__wake/idle-tick'
 const ORIGIN_TIMEOUT_MS = 2500
 const LAST_SEEN_KEY = 'lastSeenMs'
-const LAST_CRON_KEY = 'lastCronJson'
-const DEFAULT_IDLE_MINUTES = 30
+const DEFAULT_IDLE_MINUTES = 20
+/** Cap KV writes: at most one lastSeen update per this window (reads are cheaper). */
+const TOUCH_THROTTLE_MS = 5 * 60_000
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
 
     if (url.pathname === STATUS_PATH) {
-      // Wake-page polls — do not count as user activity
+      // Wake-page polls - do not count as user activity
       const up = await isOriginUp(env)
       return Response.json(
         { up },
@@ -34,7 +35,7 @@ export default {
       )
     }
 
-    // Optional manual trigger (e.g. debugging). Primary path is hourly scheduled().
+    // GitHub Actions (every 20m) + optional manual debug
     if (url.pathname === IDLE_TICK_PATH) {
       if (!authorizeIdleTick(request, env)) {
         return new Response('Unauthorized', { status: 401 })
@@ -52,7 +53,7 @@ export default {
     }
 
     if (await isOriginUp(env)) {
-      // Only real page loads reset idle — not SPA/XHR/API polls or static assets
+      // Only real page loads reset idle - not SPA/XHR/API polls or static assets
       if (isUserNavigation(request)) {
         ctx.waitUntil(touchLastSeen(env))
       }
@@ -61,13 +62,8 @@ export default {
 
     const startResult = await ensureInstanceStarted(env)
     // Start the idle clock from wake so a just-started demo isn't stopped early
-    ctx.waitUntil(touchLastSeen(env))
+    ctx.waitUntil(touchLastSeen(env, { force: true }))
     return waitingPageResponse(startResult)
-  },
-
-  async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
-    // Hourly: visited in last IDLE_STOP_MINUTES? keep running. Else stop. Already stopped? no-op.
-    await maybeStopIfIdle(env)
   },
 }
 
@@ -93,9 +89,18 @@ function isUserNavigation(request: Request): boolean {
   return false
 }
 
-async function touchLastSeen(env: Env): Promise<void> {
+async function touchLastSeen(
+  env: Env,
+  opts?: { force?: boolean },
+): Promise<void> {
   try {
-    await env.WAKE_KV.put(LAST_SEEN_KEY, String(Date.now()))
+    const now = Date.now()
+    if (!opts?.force) {
+      const raw = await env.WAKE_KV.get(LAST_SEEN_KEY)
+      const last = Number(raw)
+      if (Number.isFinite(last) && now - last < TOUCH_THROTTLE_MS) return
+    }
+    await env.WAKE_KV.put(LAST_SEEN_KEY, String(now))
   } catch (err) {
     console.error('touchLastSeen failed', err)
   }
@@ -107,52 +112,41 @@ async function maybeStopIfIdle(env: Env): Promise<Record<string, unknown>> {
 
   const raw = await env.WAKE_KV.get(LAST_SEEN_KEY)
   if (!raw) {
-    const result = { action: 'skip', reason: 'no-lastSeen' }
-    await rememberCron(env, result)
-    return result
+    // No activity recorded: if still running, stop (avoids forever-on with empty KV)
+    const state = await getInstanceState(env)
+    if (state !== 'running') {
+      return { action: 'skip', reason: 'no-lastSeen', state }
+    }
+    const stopOk = await stopInstance(env)
+    return {
+      action: stopOk ? 'stopped' : 'stop-failed',
+      reason: 'no-lastSeen',
+      state,
+    }
   }
 
   const lastSeen = Number(raw)
   if (!Number.isFinite(lastSeen)) {
-    const result = { action: 'skip', reason: 'bad-lastSeen' }
-    await rememberCron(env, result)
-    return result
+    return { action: 'skip', reason: 'bad-lastSeen' }
   }
 
   const idleFor = Date.now() - lastSeen
   const idleForMin = Math.round(idleFor / 60_000)
   if (idleFor < idleMs) {
-    const result = { action: 'skip', reason: 'still-active', idleForMin, idleMinutes }
-    await rememberCron(env, result)
-    return result
+    return { action: 'skip', reason: 'still-active', idleForMin, idleMinutes }
   }
 
   const state = await getInstanceState(env)
   if (state !== 'running') {
-    const result = { action: 'skip', reason: 'not-running', state, idleForMin }
-    await rememberCron(env, result)
-    return result
+    return { action: 'skip', reason: 'not-running', state, idleForMin }
   }
 
   const stopOk = await stopInstance(env)
-  const result = {
+  return {
     action: stopOk ? 'stopped' : 'stop-failed',
     idleForMin,
     idleMinutes,
     state,
-  }
-  await rememberCron(env, result)
-  return result
-}
-
-async function rememberCron(env: Env, result: Record<string, unknown>): Promise<void> {
-  try {
-    await env.WAKE_KV.put(
-      LAST_CRON_KEY,
-      JSON.stringify({ at: Date.now(), ...result }),
-    )
-  } catch (err) {
-    console.error('rememberCron failed', err)
   }
 }
 
@@ -335,7 +329,7 @@ function waitingPageResponse(startResult = 'unknown'): Response {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Starting Academistream…</title>
+  <title>Starting Academistream</title>
   <style>
     :root {
       --bg: #0f1714;
@@ -388,7 +382,7 @@ function waitingPageResponse(startResult = 'unknown'): Response {
   <main>
     <div class="spinner" aria-hidden="true"></div>
     <h1>Starting the demo</h1>
-    <p>The server was idle to keep costs low. It usually takes about 1–2 minutes.</p>
+    <p>The server was idle to keep costs low. It usually takes about 1-2 minutes.</p>
     <p id="status">Waking EC2…</p>
   </main>
   <script>
@@ -400,7 +394,7 @@ function waitingPageResponse(startResult = 'unknown'): Response {
         const res = await fetch('/__wake/status', { cache: 'no-store' });
         const data = await res.json();
         if (data.up) {
-          statusEl.textContent = 'Ready — loading…';
+          statusEl.textContent = 'Ready, loading…';
           location.reload();
           return;
         }

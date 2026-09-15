@@ -59,7 +59,7 @@ export class AssignmentsService {
             tenantId,
             userId: input.userId,
             type: 'assignment.created',
-            title: 'New assignment',
+            title: 'New training assigned',
             body: `You were assigned: ${video.title}`,
         })
 

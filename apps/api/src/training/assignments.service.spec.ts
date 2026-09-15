@@ -96,7 +96,7 @@ describe('AssignmentsService', () => {
       tenantId: 10,
       userId: 4,
       type: 'assignment.created',
-      title: 'New assignment',
+      title: 'New training assigned',
       body: 'You were assigned: Safety 101',
     })
   })

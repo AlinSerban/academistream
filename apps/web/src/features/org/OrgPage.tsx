@@ -5,6 +5,8 @@ import {
   PaginationControls,
   slicePage,
 } from '../../components/PaginationControls'
+import { useToast } from '../../components/Toast'
+import { formatAuditAction, formatEntityType } from '../../lib/eventLabels'
 import { useMeQuery } from '../auth/authApi'
 import { useAppSelector } from '../../app/hooks'
 import {
@@ -34,11 +36,7 @@ export function OrgPage() {
     <>
       <PageHeader
         title="Organization"
-        subtitle={
-          me
-            ? `Invites, members, audit · ${me.email}`
-            : 'Invites, members, audit'
-        }
+        subtitle={me ? me.email : 'Invites, members, and audit'}
       />
 
       {isAdmin ? (
@@ -57,11 +55,10 @@ export function OrgPage() {
             <h2 className="panel-title">Organization</h2>
           </header>
           <div className="panel-body">
-            <p className="cell-primary mb-2">Workspace admin area</p>
+            <p className="cell-primary mb-2">Admin tools</p>
             <p className="text-muted text-sm">
-              Invites, members, and exports are managed by your workspace admin.
-              Switch to an admin account if you need those tools. Instructors can
-              also view audit activity when signed in with that role.
+              Invites, members, and exports require a workspace admin account.
+              Instructors can still view audit activity.
             </p>
           </div>
         </section>
@@ -74,10 +71,10 @@ function InviteSection() {
   const { data: invites = [], isError } = useGetInvitesQuery()
   const [createInvite, createState] = useCreateInviteMutation()
   const [revokeInvite, revokeState] = useRevokeInviteMutation()
+  const { showToast } = useToast()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<InviteRole>('learner')
   const [tokenOnce, setTokenOnce] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -88,15 +85,17 @@ function InviteSection() {
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
-    setMessage(null)
     setTokenOnce(null)
     try {
       const created = await createInvite({ email, role }).unwrap()
       setTokenOnce(created.token)
       setEmail('')
-      setMessage(`Invite #${created.id} created — copy the token now.`)
+      showToast({
+        message: `Invite #${created.id} created. Copy the token below.`,
+        tone: 'success',
+      })
     } catch {
-      setMessage('Failed to create invite')
+      showToast({ message: 'Failed to create invite', tone: 'error' })
     }
   }
 
@@ -197,11 +196,6 @@ function InviteSection() {
             </button>
           </div>
         </form>
-        {message ? (
-          <p className="alert-info mt-3 text-sm" role="status">
-            {message}
-          </p>
-        ) : null}
         {tokenOnce ? (
           <p className="alert-warn mt-3">
             Token: {tokenOnce}
@@ -220,7 +214,7 @@ function InviteSection() {
 function MembersSection() {
   const { data: members = [], isError } = useGetMembersQuery()
   const [removeMember, removeState] = useRemoveMemberMutation()
-  const [message, setMessage] = useState<string | null>(null)
+  const { showToast } = useToast()
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -230,11 +224,14 @@ function MembersSection() {
   const paged = slicePage(members, page, PAGE_SIZE)
 
   async function onRemove(userId: number) {
-    setMessage(null)
     try {
       await removeMember(userId).unwrap()
+      showToast({ message: 'Member removed.', tone: 'success' })
     } catch {
-      setMessage('Remove failed (last tenant_admin cannot be removed).')
+      showToast({
+        message: 'Remove failed (last tenant_admin cannot be removed).',
+        tone: 'error',
+      })
     }
   }
 
@@ -254,11 +251,6 @@ function MembersSection() {
         <p className="panel-empty">No members.</p>
       ) : (
         <>
-          {message ? (
-            <p className="alert-error px-5 pt-4 text-sm" role="alert">
-              {message}
-            </p>
-          ) : null}
           <table className="data-table data-table-zebra">
             <thead>
               <tr>
@@ -395,7 +387,7 @@ function QuotasSection() {
       </header>
       <div className="panel-body">
         <p className="text-muted mb-4 text-sm">
-          Tenant {data.tenantId} — members and videos vs plan limits.
+          Members and videos for tenant {data.tenantId} vs plan limits.
         </p>
         <dl className="grid gap-3 sm:grid-cols-2">
           <div className="stat-card">
@@ -460,14 +452,14 @@ function AuditSection() {
             <tbody>
               {paged.map((ev) => (
                 <tr key={ev.id}>
-                  <td className="cell-primary">{ev.action}</td>
+                  <td className="cell-primary">{formatAuditAction(ev.action)}</td>
                   <td className="cell-secondary">
-                    {ev.entityType ?? '—'}
+                    {ev.entityType ? formatEntityType(ev.entityType) : '-'}
                     {ev.entityId != null ? ` #${ev.entityId}` : ''}
                   </td>
                   <td className="cell-secondary">
                     {new Date(ev.createdAt).toLocaleString()}
-                    {ev.actorUserId != null ? ` · actor ${ev.actorUserId}` : ''}
+                    {ev.actorUserId != null ? `, actor ${ev.actorUserId}` : ''}
                   </td>
                 </tr>
               ))}

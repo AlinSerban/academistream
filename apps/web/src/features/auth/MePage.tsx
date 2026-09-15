@@ -94,7 +94,7 @@ function formatMembership(membership: Membership): string {
     learner: 'Learner',
   }
   const role = roleLabels[membership.role] ?? membership.role
-  return `Tenant ${membership.tenantId} — ${role}`
+  return `Tenant ${membership.tenantId} (${role})`
 }
 
 function getMeErrorMessage(

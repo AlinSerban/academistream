@@ -1,0 +1,27 @@
+name: Demo idle stop
+
+# Every 20 minutes: ask the wake Worker to stop EC2 if no page visit in IDLE_STOP_MINUTES (20).
+on:
+  schedule:
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+
+jobs:
+  idle-tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Call wake idle-tick
+        env:
+          IDLE_TICK_SECRET: ${{ secrets.WAKE_IDLE_TICK_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${IDLE_TICK_SECRET}" ]; then
+            echo "Missing repo secret WAKE_IDLE_TICK_SECRET (same value as Cloudflare IDLE_TICK_SECRET)."
+            exit 1
+          fi
+          curl -fsS \
+            -H "Authorization: Bearer ${IDLE_TICK_SECRET}" \
+            -H "Accept: application/json" \
+            "https://academistream.online/__wake/idle-tick"
+          echo

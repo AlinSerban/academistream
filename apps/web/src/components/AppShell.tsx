@@ -52,7 +52,7 @@ export function AppShell() {
     ? `Tenant ${membership.tenantId}`
     : me?.isPlatformAdmin
       ? 'Platform'
-      : '—'
+      : '-'
   const roleLabel = role
     ? (roleLabels[role] ?? role)
     : me?.isPlatformAdmin

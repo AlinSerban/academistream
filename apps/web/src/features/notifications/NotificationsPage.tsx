@@ -9,6 +9,7 @@ import {
   useMarkAllNotificationsReadMutation,
   useMarkNotificationReadMutation,
 } from './notificationsApi'
+import { formatNotificationType } from '../../lib/eventLabels'
 
 const PAGE_SIZE = 5
 
@@ -29,7 +30,7 @@ export function NotificationsPage() {
     <>
       <PageHeader
         title="Notifications"
-        subtitle={unread > 0 ? `${unread} unread` : 'All caught up'}
+        subtitle={unread > 0 ? `${unread} unread` : 'No unread messages'}
         action={
           unread > 0 ? (
             <button
@@ -65,8 +66,7 @@ export function NotificationsPage() {
           <div className="panel-body">
             <p className="cell-primary mb-2">Inbox is empty</p>
             <p className="text-muted text-sm">
-              Training updates and workspace notices will appear here when they
-              arrive.
+              New training updates will show up here.
             </p>
           </div>
         ) : (
@@ -83,12 +83,15 @@ export function NotificationsPage() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="cell-primary">{n.title ?? n.type}</p>
+                      <p className="cell-primary">
+                        {n.title ?? formatNotificationType(n.type)}
+                      </p>
                       {n.body ? (
                         <p className="cell-secondary mt-1">{n.body}</p>
                       ) : null}
                       <p className="cell-meta">
-                        {n.type} · {new Date(n.createdAt).toLocaleString()}
+                        {formatNotificationType(n.type)} ·{' '}
+                        {new Date(n.createdAt).toLocaleString()}
                       </p>
                     </div>
                     {n.readAt == null ? (

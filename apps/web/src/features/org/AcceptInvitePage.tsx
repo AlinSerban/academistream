@@ -1,33 +1,38 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useToast } from '../../components/Toast'
 import { useAcceptInviteMutation } from './orgApi'
 
 export function AcceptInvitePage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const [acceptInvite, state] = useAcceptInviteMutation()
+  const { showToast } = useToast()
   const [token, setToken] = useState(params.get('token') ?? '')
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
-  const [message, setMessage] = useState<string | null>(null)
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    setMessage(null)
     try {
       const result = await acceptInvite({
         token,
         name: name || undefined,
         password: password || undefined,
       }).unwrap()
-      setMessage(
-        `Joined tenant ${result.tenantId} as ${result.role}. You can log in as ${result.email}.`,
-      )
+      showToast({
+        message: `Joined tenant ${result.tenantId} as ${result.role}. You can log in as ${result.email}.`,
+        tone: 'success',
+        durationMs: 4500,
+      })
       setTimeout(() => navigate('/login', { replace: true }), 1500)
     } catch {
-      setMessage(
-        'Accept failed — invalid/expired token, or name+password (min 8) required for new users.',
-      )
+      showToast({
+        message:
+          'Accept failed. Invalid or expired token, or name and password (min 8) required for new users.',
+        tone: 'error',
+        durationMs: 5000,
+      })
     }
   }
 
@@ -66,12 +71,6 @@ export function AcceptInvitePage() {
             {state.isLoading ? 'Accepting…' : 'Accept invite'}
           </button>
         </form>
-
-        {message ? (
-          <p className="alert-info mt-4" role="status">
-            {message}
-          </p>
-        ) : null}
 
         <p className="mt-6 text-sm">
           <Link className="link-accent" to="/login">

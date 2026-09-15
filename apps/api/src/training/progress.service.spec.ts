@@ -99,6 +99,82 @@ describe('ProgressService', () => {
     expect(result.threshold).toBe(COMPLETION_PERCENT_THRESHOLD)
   })
 
+  it('upsert keeps higher percent by default (no decrease)', async () => {
+    mockVideoThenProgress([
+      {
+        id: 1,
+        tenantId: 10,
+        userId: 4,
+        videoId: 3,
+        percent: 58,
+        positionSeconds: 120,
+      },
+    ])
+    const updated = {
+      id: 1,
+      tenantId: 10,
+      userId: 4,
+      videoId: 3,
+      percent: 58,
+      positionSeconds: 120,
+    }
+    db.update.mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([updated]),
+        }),
+      }),
+    })
+
+    const result = await service.upsertMine(
+      10,
+      4,
+      { videoId: 3, percent: 2 },
+      'learner',
+    )
+
+    expect(result.progress.percent).toBe(58)
+  })
+
+  it('upsert allows decrease when allowDecrease is true', async () => {
+    mockVideoThenProgress([
+      {
+        id: 1,
+        tenantId: 10,
+        userId: 4,
+        videoId: 3,
+        percent: 58,
+        positionSeconds: 120,
+      },
+    ])
+    const updated = {
+      id: 1,
+      tenantId: 10,
+      userId: 4,
+      videoId: 3,
+      percent: 2,
+      positionSeconds: 0,
+    }
+    const setMock = jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([updated]),
+      }),
+    })
+    db.update.mockReturnValue({ set: setMock })
+
+    const result = await service.upsertMine(
+      10,
+      4,
+      { videoId: 3, percent: 2, positionSeconds: 0, allowDecrease: true },
+      'learner',
+    )
+
+    expect(setMock).toHaveBeenCalledWith(
+      expect.objectContaining({ percent: 2, positionSeconds: 0 }),
+    )
+    expect(result.progress.percent).toBe(2)
+  })
+
   it('upsert at threshold creates completion idempotently', async () => {
     mockVideoThenProgress([])
     const created = {

@@ -24,7 +24,7 @@ export function PageHeader({
         {ctx?.tenantLabel ? (
           <div className="tenant-pill">
             <strong>{ctx.tenantLabel}</strong>
-            {ctx.roleLabel ? <> · {ctx.roleLabel}</> : null}
+            {ctx.roleLabel ? <>, {ctx.roleLabel}</> : null}
           </div>
         ) : null}
       </div>

@@ -169,7 +169,7 @@ B2B training-video demo on **EC2 t3.small** (eu-central-1) + Docker Compose + Ca
 | | |
 |--|--|
 | Cold start | If the VM was idle, first load shows “Starting the demo…” (~1–2 min), then the app |
-| Auto-stop | Hourly check stops EC2 when there was no page visit for **30 minutes** |
+| Auto-stop | GitHub Actions every **20 minutes** stops EC2 when there was no page visit for **20 minutes** |
 | Media | Local disk on the instance (S3 optional; see AWS path above) |
 | Cost | Pay compute only while running; keep the **Elastic IP**; EBS still bills when stopped |
 

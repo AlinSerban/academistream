@@ -39,6 +39,7 @@ export class ProgressService {
     ) {
         const percent = Math.min(100, Math.max(0, Math.round(input.percent)))
         const positionSeconds = Math.max(0, Math.round(input.positionSeconds ?? 0))
+        const allowDecrease = input.allowDecrease === true
 
         const video = await this.assertVideoPlayable(
             input.videoId,
@@ -68,8 +69,12 @@ export class ProgressService {
 
         let progress
         if (existing) {
-            const nextPercent = Math.max(existing.percent, percent)
-            const nextPosition = Math.max(existing.positionSeconds, positionSeconds)
+            const nextPercent = allowDecrease
+                ? percent
+                : Math.max(existing.percent, percent)
+            const nextPosition = allowDecrease
+                ? positionSeconds
+                : Math.max(existing.positionSeconds, positionSeconds)
             const [updated] = await this.db
                 .update(watchProgress)
                 .set({

@@ -41,6 +41,7 @@ export interface UpsertProgressRequest {
   videoId: number
   percent: number
   positionSeconds?: number
+  allowDecrease?: boolean
 }
 
 export interface UpsertProgressResponse {

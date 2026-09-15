@@ -7,18 +7,20 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Kafka, type Consumer } from 'kafkajs';
 import { VideoProcessingService } from '../video/video-processing.service';
+import { ensureKafkaTopics } from './ensure-topics';
 
 @Injectable()
 export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(KafkaConsumerService.name);
     private readonly topic: string;
+    private readonly brokers: string[];
     private consumer: Consumer;
 
     constructor(
         private readonly config: ConfigService,
         private readonly videoProcessing: VideoProcessingService,
     ) {
-        const brokers = (config.get<string>('KAFKA_BROKERS') ?? 'localhost:29092')
+        this.brokers = (config.get<string>('KAFKA_BROKERS') ?? 'localhost:29092')
             .split(',')
             .map((b) => b.trim())
             .filter(Boolean);
@@ -27,13 +29,14 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
             config.get<string>('KAFKA_VIDEO_TOPIC') ?? 'video.processing';
 
         const kafka = new Kafka({
-            clientId: 'academistream-worker',
-            brokers,
+            clientId: 'academistream-worker-processing',
+            brokers: this.brokers,
         });
         this.consumer = kafka.consumer({ groupId: 'video-processing' });
     }
 
     async onModuleInit() {
+        await ensureKafkaTopics(this.brokers, [this.topic]);
         await this.consumer.connect();
         await this.consumer.subscribe({ topic: this.topic, fromBeginning: false });
         await this.consumer.run({

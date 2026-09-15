@@ -5,6 +5,7 @@ import type {
   CreateCourseRequest,
   CreateVideoRequest,
   PlaybackResponse,
+  PublishState,
   UploadVideoArg,
   Video,
 } from './types'
@@ -50,6 +51,17 @@ export const contentApi = createApi({
       },
       invalidatesTags: ['Videos'],
     }),
+    publishVideo: builder.mutation<
+      Video,
+      { videoId: number; publishState: PublishState }
+    >({
+      query: ({ videoId, publishState }) => ({
+        url: `/videos/${videoId}/publish`,
+        method: 'PATCH',
+        body: { publishState },
+      }),
+      invalidatesTags: ['Videos'],
+    }),
     getPlaybackUrl: builder.query<PlaybackResponse, number>({
       query: (videoId) => `/videos/${videoId}/playback`,
     }),
@@ -62,5 +74,6 @@ export const {
   useGetVideosQuery,
   useCreateVideoMutation,
   useUploadVideoMutation,
+  usePublishVideoMutation,
   useLazyGetPlaybackUrlQuery,
 } = contentApi
