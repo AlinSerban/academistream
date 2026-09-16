@@ -25,7 +25,7 @@ EC2_INSTANCE_ID = "i-0c8e42174984f3d6c"
 ORIGIN_IP = "3.69.93.245"
 IDLE_STOP_MINUTES = "20"
 # Public gate: StartInstances only when URL has ?wake=<this> (same value in root README)
-WAKE_GATE = "1c4b60b524e25fe5b4b2e277"
+WAKE_GATE = "true"
 
 # Secrets:
 #   npx wrangler secret put AWS_ACCESS_KEY_ID

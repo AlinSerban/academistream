@@ -21,7 +21,7 @@ If EC2 is already running, traffic is proxied to the instance (Elastic IP) with 
 
 **Bot / crawler cost control**
 
-1. **Wake gate:** `WAKE_GATE` in `wrangler.toml` must match `?wake=` (same token in root README). Not a password — it is public in the repo — but stops random scanners that only hit the bare domain.
+1. **Wake gate:** `WAKE_GATE` in `wrangler.toml` must match `?wake=` (root README uses `?wake=true`). Not a password — it is public in the repo — but stops random scanners that only hit the bare domain.
 2. **Cloudflare Bot Fight Mode** (dashboard):
    - [dash.cloudflare.com](https://dash.cloudflare.com) → **academistream.online** → **Security** → **Bots** → **On**
    - Block AI bot policies (search / agent / training) for a people-only demo
