@@ -7,6 +7,8 @@ export interface Env {
   EC2_INSTANCE_ID: string
   ORIGIN_IP: string
   WAKE_KV: KVNamespace
+  /** Public gate token: StartInstances only when ?wake=<token> (see README URL). */
+  WAKE_GATE: string
   /** Minutes without a page visit before StopInstances (default 20). */
   IDLE_STOP_MINUTES?: string
   /** Shared secret for GET /__wake/idle-tick (GitHub Actions + manual). */
@@ -53,11 +55,19 @@ export default {
     }
 
     if (await isOriginUp(env)) {
-      // Only real page loads reset idle - not SPA/XHR/API polls or static assets
-      if (isUserNavigation(request)) {
+      // Only real browser navigations reset idle (not SPA/XHR, assets, or most bots)
+      if (isBrowserNavigation(request)) {
         ctx.waitUntil(touchLastSeen(env))
       }
       return proxyToOrigin(request, env)
+    }
+
+    // EC2 is down: only the README wake link may StartInstances
+    if (!hasValidWakeGate(url, env)) {
+      return asleepPageResponse()
+    }
+    if (!isBrowserNavigation(request)) {
+      return refuseWakeResponse()
     }
 
     const startResult = await ensureInstanceStarted(env)
@@ -76,17 +86,70 @@ function authorizeIdleTick(request: Request, env: Env): boolean {
   return bearer === expected || header === expected
 }
 
-/** Browser document navigation (clicking a link / opening the URL), not fetch()/XHR. */
-function isUserNavigation(request: Request): boolean {
+function hasValidWakeGate(url: URL, env: Env): boolean {
+  const expected = env.WAKE_GATE
+  if (!expected) return false
+  return url.searchParams.get('wake') === expected
+}
+
+/**
+ * Real browser document navigation (address bar / link click).
+ * Most crawlers omit Sec-Fetch-Mode or use a non-navigate mode.
+ */
+function isBrowserNavigation(request: Request): boolean {
   if (request.method !== 'GET' && request.method !== 'HEAD') return false
-  const mode = request.headers.get('Sec-Fetch-Mode')
-  if (mode === 'navigate') return true
-  // Some clients omit Sec-Fetch-*; treat HTML navigations as activity
-  if (!mode) {
-    const accept = request.headers.get('Accept') || ''
-    if (accept.includes('text/html')) return true
-  }
-  return false
+  return request.headers.get('Sec-Fetch-Mode') === 'navigate'
+}
+
+function refuseWakeResponse(): Response {
+  return new Response('Demo offline', {
+    status: 403,
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
+  })
+}
+
+function asleepPageResponse(): Response {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Demo asleep</title>
+  <style>
+    :root { --bg: #0f1714; --fg: #e8efe9; --muted: #a8b5ad; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      padding: 1.5rem;
+    }
+    main { width: min(28rem, 100%); text-align: center; }
+    h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.75rem; }
+    p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Demo is asleep</h1>
+    <p>Open the wake link from the Academistream GitHub README to start it. Plain visits do not power on the server (cost control).</p>
+  </main>
+</body>
+</html>`
+  return new Response(html, {
+    status: 503,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
+  })
 }
 
 async function touchLastSeen(

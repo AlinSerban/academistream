@@ -162,14 +162,16 @@ See also: `.env.aws.example` for a copy-paste AWS env block.
 
 ## Hosted demo
 
-**URL:** https://academistream.online  
+**URL:** https://academistream.online/?wake=1c4b60b524e25fe5b4b2e277  
+
+Use that full link (the `wake` query param). Opening the bare domain while the VM is stopped will not start it — that keeps random crawlers from burning EC2 time.
 
 B2B training-video demo on **EC2 t3.small** (eu-central-1) + Docker Compose + Caddy HTTPS.
 
 | | |
 |--|--|
-| Cold start | If the VM was idle, first load shows “Starting the demo…” (~1–2 min), then the app |
-| Auto-stop | GitHub Actions every **20 minutes** stops EC2 when there was no page visit for **20 minutes** |
+| Cold start | Open the wake URL above; “Starting the demo…” (~1–2 min), then the app |
+| Auto-stop | GitHub Actions checks idle and stops EC2 when there was no page visit for **20 minutes** |
 | Media | Local disk on the instance (S3 optional; see AWS path above) |
 | Cost | Pay compute only while running; keep the **Elastic IP**; EBS still bills when stopped |
 

@@ -1,14 +1,16 @@
 # Demo wake Worker (Cloudflare)
 
-When someone opens `https://academistream.online` and the EC2 demo is **stopped**, this Worker:
+When someone opens the **wake URL** from the root README (`?wake=…`) and the EC2 demo is **stopped**, this Worker:
 
 1. Calls AWS `StartInstances`
 2. Shows a **“Starting the demo…”** page
 3. Polls until `/api/health` works, then reloads into the app
 
-If EC2 is already running, traffic is proxied to the instance (Elastic IP).
+Bare `https://academistream.online` (no matching `wake` param) while stopped returns **Demo is asleep** and does **not** start EC2.
 
-**Auto-stop (GitHub Actions):** workflow `.github/workflows/demo-idle-stop.yml` runs every **20 minutes** and calls `GET /__wake/idle-tick`:
+If EC2 is already running, traffic is proxied to the instance (Elastic IP) with or without the param.
+
+**Auto-stop (GitHub Actions):** workflow `.github/workflows/demo-idle-stop.yml` runs on a schedule and calls `GET /__wake/idle-tick`:
 
 1. Checks EC2 state - if **not running**, do nothing
 2. If **running**, checks last **page navigation** time (SPA/API polls do not count)
@@ -16,6 +18,14 @@ If EC2 is already running, traffic is proxied to the instance (Elastic IP).
 4. No visit in 20+ minutes (or no `lastSeen` in KV) → `StopInstances`
 
 `lastSeen` KV writes are throttled (at most once per 5 minutes) to stay under the Workers KV free tier.
+
+**Bot / crawler cost control**
+
+1. **Wake gate:** `WAKE_GATE` in `wrangler.toml` must match `?wake=` (same token in root README). Not a password — it is public in the repo — but stops random scanners that only hit the bare domain.
+2. **Cloudflare Bot Fight Mode** (dashboard):
+   - [dash.cloudflare.com](https://dash.cloudflare.com) → **academistream.online** → **Security** → **Bots** → **On**
+   - Block AI bot policies (search / agent / training) for a people-only demo
+3. **Browser navigations only** for wake + idle refresh (`Sec-Fetch-Mode: navigate`)
 
 ## Secrets (required for auto-stop)
 
@@ -97,7 +107,7 @@ Worker routes alone are not enough — traffic must go through Cloudflare:
 
 **Grey cloud = Worker never runs** (DNS goes straight to EC2). Wake will not work until the cloud is orange.
 
-After proxy is on: stop the EC2 instance, open `https://academistream.online`, confirm the starting page, wait for the app.
+After proxy is on: stop the EC2 instance, open the **wake URL** from the root README, confirm the starting page, wait for the app.
 
 ## Cost notes
 
@@ -114,7 +124,7 @@ npx wrangler dev
 
 ## Ops
 
-After deploy, stop the instance and open `https://academistream.online` — you should see the starting page, then the app after ~1–2 minutes.
+After deploy, stop the instance and open the wake URL from the root README — you should see the starting page, then the app after ~1–2 minutes. Bare domain while stopped should show “Demo is asleep”.
 
 Manual idle check (same as GHA):
 
