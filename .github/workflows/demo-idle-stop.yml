@@ -1,9 +1,10 @@
 name: Demo idle stop
 
-# Every 20 minutes: ask the wake Worker to stop EC2 if no page visit in IDLE_STOP_MINUTES (20).
+# Idle stop now runs on the Cloudflare Worker cron (every 20m).
+# GitHub Actions curl to /__wake/idle-tick fails under Bot Fight Mode (JS challenge).
+# Keep this workflow for optional manual runs only if you temporarily disable BFM
+# or call idle-tick from a browser; schedule is disabled on purpose.
 on:
-  schedule:
-    - cron: '*/20 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -20,6 +21,8 @@ jobs:
             echo "Missing repo secret WAKE_IDLE_TICK_SECRET (same value as Cloudflare IDLE_TICK_SECRET)."
             exit 1
           fi
+          echo "Note: with Bot Fight Mode on, this curl often gets a challenge HTML/403."
+          echo "Prefer the Worker cron trigger for idle stop."
           curl -fsS \
             -H "Authorization: Bearer ${IDLE_TICK_SECRET}" \
             -H "Accept: application/json" \

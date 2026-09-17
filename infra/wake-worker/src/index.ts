@@ -75,6 +75,16 @@ export default {
     ctx.waitUntil(touchLastSeen(env, { force: true }))
     return waitingPageResponse(startResult)
   },
+
+  // Runs inside Cloudflare (not HTTP) — not blocked by Bot Fight Mode.
+  // GitHub Actions curl to /__wake/idle-tick is challenged when BFM is on.
+  async scheduled(
+    _controller: ScheduledController,
+    env: Env,
+    _ctx: ExecutionContext,
+  ): Promise<void> {
+    await maybeStopIfIdle(env)
+  },
 }
 
 function authorizeIdleTick(request: Request, env: Env): boolean {

@@ -15,8 +15,11 @@ zone_name = "academistream.online"
 binding = "WAKE_KV"
 id = "2be7e35655774aa3891454dec5a7dbbc"
 
-# Idle stop is triggered by GitHub Actions (.github/workflows/demo-idle-stop.yml),
-# not by a Cloudflare cron.
+# Idle stop: Cloudflare cron every 20 minutes (Worker scheduled handler).
+# Do not rely on GitHub Actions HTTP → /__wake/idle-tick while Bot Fight Mode is on
+# (curl gets challenged and never reaches the Worker).
+[triggers]
+crons = ["*/20 * * * *"]
 
 [vars]
 AWS_REGION = "eu-central-1"
@@ -30,4 +33,4 @@ WAKE_GATE = "true"
 # Secrets:
 #   npx wrangler secret put AWS_ACCESS_KEY_ID
 #   npx wrangler secret put AWS_SECRET_ACCESS_KEY
-#   npx wrangler secret put IDLE_TICK_SECRET   # required for GHA idle-tick
+#   npx wrangler secret put IDLE_TICK_SECRET   # optional manual /__wake/idle-tick

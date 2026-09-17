@@ -10,12 +10,14 @@ Bare `https://academistream.online` (no matching `wake` param) while stopped ret
 
 If EC2 is already running, traffic is proxied to the instance (Elastic IP) with or without the param.
 
-**Auto-stop (GitHub Actions):** workflow `.github/workflows/demo-idle-stop.yml` runs on a schedule and calls `GET /__wake/idle-tick`:
+**Auto-stop:** Cloudflare Worker **cron every 20 minutes** calls the same idle logic as `GET /__wake/idle-tick` (inside the Worker — not blocked by Bot Fight Mode).
 
 1. Checks EC2 state - if **not running**, do nothing
 2. If **running**, checks last **page navigation** time (SPA/API polls do not count)
 3. Visited within the last **20 minutes** → leave running
 4. No visit in 20+ minutes (or no `lastSeen` in KV) → `StopInstances`
+
+GitHub Actions HTTP to `/__wake/idle-tick` is unreliable while **Bot Fight Mode** is on (curl cannot pass the challenge). Schedule was removed from that workflow for that reason.
 
 `lastSeen` KV writes are throttled (at most once per 5 minutes) to stay under the Workers KV free tier.
 
@@ -27,14 +29,12 @@ If EC2 is already running, traffic is proxied to the instance (Elastic IP) with 
    - Block AI bot policies (search / agent / training) for a people-only demo
 3. **Browser navigations only** for wake + idle refresh (`Sec-Fetch-Mode: navigate`)
 
-## Secrets (required for auto-stop)
+## Secrets
 
-Same random string in both places:
+1. Cloudflare Worker: `npx wrangler secret put AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
+2. Optional: `npx wrangler secret put IDLE_TICK_SECRET` for manual `GET /__wake/idle-tick` (browser or with BFM off)
 
-1. Cloudflare Worker: `npx wrangler secret put IDLE_TICK_SECRET`
-2. GitHub repo → Settings → Secrets → Actions → `WAKE_IDLE_TICK_SECRET`
-
-Until both are set, idle-tick returns 401 and the scheduled workflow fails (EC2 will not auto-stop).
+Idle stop itself uses the Worker cron — no GitHub secret required for that path.
 
 ## One-time AWS setup (IAM)
 
