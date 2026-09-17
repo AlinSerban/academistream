@@ -21,5 +21,7 @@ export function createStorageService(config: ConfigService): StorageService {
     }
 
     const root = resolveStorageRoot(config.get<string>('STORAGE_LOCAL_ROOT'));
-    return new LocalStorageService(root);
+    const publicBaseUrl = config.get<string>('WEB_ORIGIN')?.trim()
+    const signingSecret = config.get<string>('JWT_SECRET')?.trim()
+    return new LocalStorageService(root, { publicBaseUrl, signingSecret });
 }

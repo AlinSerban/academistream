@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditService } from '../audit/audit.service';
 import { DRIZZLE } from '../db/db.module';
-import { STORAGE } from '../storage/storage.module';
+import { STORAGE } from '../storage/storage.tokens';
 import { PlaybackUrlService } from '../storage/playback-url.service';
 import { KafkaProducerService } from '../kafka/kafka.producer';
 import { QuotasService } from '../quotas/quotas.service';

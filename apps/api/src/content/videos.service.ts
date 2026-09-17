@@ -5,7 +5,7 @@ import { DRIZZLE } from "../db/db.module";
 import type { CreateVideoInput, PublishState, UpdateVideoInput } from "./types";
 import { eq, and, inArray, lt } from 'drizzle-orm';
 import type { StorageService } from "../storage/storage.types";
-import { STORAGE } from "../storage/storage.module";
+import { STORAGE } from "../storage/storage.tokens";
 import { PlaybackUrlService } from "../storage/playback-url.service";
 import { KafkaProducerService } from "../kafka/kafka.producer";
 import { AuditService } from "../audit/audit.service";
