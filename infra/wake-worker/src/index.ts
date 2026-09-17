@@ -54,24 +54,31 @@ export default {
       return new Response('Origin offline', { status: 503 })
     }
 
+    const wake = hasValidWakeGate(url, env)
+
+    // Wake link: trust AWS instance state, not only /api/health (stale cache / race).
+    if (wake) {
+      const state = await getInstanceState(env)
+      const up = await isOriginUp(env)
+      if (!up || (state !== 'running' && state !== 'pending')) {
+        const startResult = await ensureInstanceStarted(env)
+        ctx.waitUntil(touchLastSeen(env, { force: true }))
+        return waitingPageResponse(startResult)
+      }
+    }
+
     if (await isOriginUp(env)) {
-      // Only real browser navigations reset idle (not SPA/XHR, assets, or most bots)
       if (isBrowserNavigation(request)) {
         ctx.waitUntil(touchLastSeen(env))
       }
       return proxyToOrigin(request, env)
     }
 
-    // EC2 is down: only the README wake link may StartInstances
-    if (!hasValidWakeGate(url, env)) {
+    if (!wake) {
       return asleepPageResponse()
-    }
-    if (!isBrowserNavigation(request)) {
-      return refuseWakeResponse()
     }
 
     const startResult = await ensureInstanceStarted(env)
-    // Start the idle clock from wake so a just-started demo isn't stopped early
     ctx.waitUntil(touchLastSeen(env, { force: true }))
     return waitingPageResponse(startResult)
   },
@@ -109,16 +116,6 @@ function hasValidWakeGate(url: URL, env: Env): boolean {
 function isBrowserNavigation(request: Request): boolean {
   if (request.method !== 'GET' && request.method !== 'HEAD') return false
   return request.headers.get('Sec-Fetch-Mode') === 'navigate'
-}
-
-function refuseWakeResponse(): Response {
-  return new Response('Demo offline', {
-    status: 403,
-    headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'no-store',
-    },
-  })
 }
 
 function asleepPageResponse(): Response {
@@ -285,12 +282,14 @@ async function isOriginUp(env: Env): Promise<boolean> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ORIGIN_TIMEOUT_MS)
   try {
+    // cacheTtl 0: stale cached /api/health must not look "up" while EC2 is stopped
     const res = await fetch(`https://academistream.online${HEALTH_PATH}`, {
       method: 'GET',
       redirect: 'manual',
       signal: controller.signal,
-      cf: { resolveOverride: env.ORIGIN_IP },
-      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      cf: { resolveOverride: env.ORIGIN_IP, cacheTtl: 0 },
+      headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
     } as RequestInit)
     if (!res.ok) return false
     const body = (await res.json()) as { status?: string }
@@ -317,7 +316,8 @@ async function proxyToOrigin(request: Request, env: Env): Promise<Response> {
     method: request.method,
     headers,
     redirect: 'manual',
-    cf: { resolveOverride: env.ORIGIN_IP },
+    cache: 'no-store',
+    cf: { resolveOverride: env.ORIGIN_IP, cacheTtl: 0 },
   } as RequestInit
 
   if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -326,7 +326,14 @@ async function proxyToOrigin(request: Request, env: Env): Promise<Response> {
     init.duplex = 'half'
   }
 
-  return fetch(originUrl, init)
+  const res = await fetch(originUrl, init)
+  const out = new Headers(res.headers)
+  out.set('Cache-Control', 'no-store')
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: out,
+  })
 }
 
 async function ensureInstanceStarted(env: Env): Promise<string> {
