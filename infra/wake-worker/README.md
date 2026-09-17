@@ -1,6 +1,6 @@
 # Demo wake Worker (Cloudflare)
 
-When someone opens the **wake URL** from the root README (`/__wake/start?wake=…`) and the EC2 demo is **stopped**, this Worker:
+When someone opens the **wake URL** from the root README (`/?wake=true`) and the EC2 demo is **stopped**, this Worker:
 
 1. Calls AWS `StartInstances`
 2. Shows a **“Starting the demo…”** page
@@ -23,7 +23,7 @@ GitHub Actions HTTP to `/__wake/idle-tick` is unreliable while **Bot Fight Mode*
 
 **Bot / crawler cost control**
 
-1. **Wake gate:** open `/__wake/start?wake=true` (see root README). Bare `/` while stopped stays asleep. Not a password — public in the repo — but stops random scanners on the bare domain.
+1. **Wake gate:** `/?wake=true` (see root README). Bare `/` while stopped stays asleep. App HTML is always served with `Cache-Control: no-store` so browsers do not keep a stale SPA that skips wake.
 2. **Cloudflare Bot Fight Mode** (dashboard):
    - [dash.cloudflare.com](https://dash.cloudflare.com) → **academistream.online** → **Security** → **Bots** → **On**
    - Block AI bot policies (search / agent / training) for a people-only demo

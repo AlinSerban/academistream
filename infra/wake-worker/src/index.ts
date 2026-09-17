@@ -18,7 +18,6 @@ export interface Env {
 const HEALTH_PATH = '/api/health'
 const STATUS_PATH = '/__wake/status'
 const IDLE_TICK_PATH = '/__wake/idle-tick'
-const WAKE_START_PATH = '/__wake/start'
 const ORIGIN_TIMEOUT_MS = 2500
 const LAST_SEEN_KEY = 'lastSeenMs'
 const DEFAULT_IDLE_MINUTES = 20
@@ -30,53 +29,28 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === STATUS_PATH) {
-      // Wake-page polls - do not count as user activity
       const up = await isOriginUp(env)
-      return Response.json(
-        { up },
-        { headers: { 'Cache-Control': 'no-store' } },
-      )
+      return jsonNoStore({ up })
     }
 
-    // GitHub Actions (every 20m) + optional manual debug
     if (url.pathname === IDLE_TICK_PATH) {
       if (!authorizeIdleTick(request, env)) {
-        return new Response('Unauthorized', { status: 401 })
+        return new Response('Unauthorized', { status: 401, headers: noStoreHeaders() })
       }
       const result = await maybeStopIfIdle(env)
-      return Response.json(result, { headers: { 'Cache-Control': 'no-store' } })
+      return jsonNoStore(result)
     }
 
-    // Dedicated wake URL (not "/") so browsers cannot serve a cached SPA shell.
-    if (url.pathname === WAKE_START_PATH) {
-      if (!hasValidWakeGate(url, env)) {
-        return asleepPageResponse()
-      }
-      const state = await getInstanceState(env)
-      const up = await isOriginUp(env)
-      // Only skip StartInstances when AWS says running/pending AND health is up.
-      if (up && (state === 'running' || state === 'pending')) {
-        return Response.redirect('https://academistream.online/', 302)
-      }
-      const startResult = await ensureInstanceStarted(env)
-      ctx.waitUntil(touchLastSeen(env, { force: true }))
-      return waitingPageResponse(startResult)
-    }
-
-    // Let ACME / other challenges through when origin is reachable
     if (url.pathname.startsWith('/.well-known/')) {
       if (await isOriginUp(env)) {
         return proxyToOrigin(request, env)
       }
-      return new Response('Origin offline', { status: 503 })
+      return new Response('Origin offline', { status: 503, headers: noStoreHeaders() })
     }
 
-    // Old README style /?wake=true → canonical wake path (avoids cached "/")
-    if (url.pathname === '/' && hasValidWakeGate(url, env)) {
-      return Response.redirect(
-        `https://academistream.online${WAKE_START_PATH}?wake=${encodeURIComponent(env.WAKE_GATE)}`,
-        302,
-      )
+    // Real fix for "login without start": never cache HTML; wake link always hits this Worker.
+    if (hasValidWakeGate(url, env)) {
+      return handleWakeRequest(env, ctx)
     }
 
     if (await isOriginUp(env)) {
@@ -89,8 +63,6 @@ export default {
     return asleepPageResponse()
   },
 
-  // Runs inside Cloudflare (not HTTP) — not blocked by Bot Fight Mode.
-  // GitHub Actions curl to /__wake/idle-tick is challenged when BFM is on.
   async scheduled(
     _controller: ScheduledController,
     env: Env,
@@ -98,6 +70,48 @@ export default {
   ): Promise<void> {
     await maybeStopIfIdle(env)
   },
+}
+
+/** Start EC2 if needed, else send the browser to the app. Always no-store. */
+async function handleWakeRequest(
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  const state = await getInstanceState(env)
+  const up = await isOriginUp(env)
+
+  if (up && (state === 'running' || state === 'pending')) {
+    return noStoreRedirect('https://academistream.online/')
+  }
+
+  const startResult = await ensureInstanceStarted(env)
+  ctx.waitUntil(touchLastSeen(env, { force: true }))
+  return waitingPageResponse(startResult)
+}
+
+function noStoreHeaders(extra?: Record<string, string>): Headers {
+  const headers = new Headers(extra)
+  headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+  headers.set('CDN-Cache-Control', 'no-store')
+  headers.set('Cloudflare-CDN-Cache-Control', 'no-store')
+  headers.set('Pragma', 'no-cache')
+  headers.set('Expires', '0')
+  return headers
+}
+
+function jsonNoStore(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    headers: noStoreHeaders({
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+function noStoreRedirect(location: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: noStoreHeaders({ Location: location }),
+  })
 }
 
 function authorizeIdleTick(request: Request, env: Env): boolean {
@@ -115,10 +129,6 @@ function hasValidWakeGate(url: URL, env: Env): boolean {
   return url.searchParams.get('wake') === expected
 }
 
-/**
- * Real browser document navigation (address bar / link click).
- * Most crawlers omit Sec-Fetch-Mode or use a non-navigate mode.
- */
 function isBrowserNavigation(request: Request): boolean {
   if (request.method !== 'GET' && request.method !== 'HEAD') return false
   return request.headers.get('Sec-Fetch-Mode') === 'navigate'
@@ -130,6 +140,7 @@ function asleepPageResponse(): Response {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store" />
   <title>Demo asleep</title>
   <style>
     :root { --bg: #0f1714; --fg: #e8efe9; --muted: #a8b5ad; }
@@ -158,10 +169,7 @@ function asleepPageResponse(): Response {
 </html>`
   return new Response(html, {
     status: 503,
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-store',
-    },
+    headers: noStoreHeaders({ 'Content-Type': 'text/html; charset=utf-8' }),
   })
 }
 
@@ -188,7 +196,6 @@ async function maybeStopIfIdle(env: Env): Promise<Record<string, unknown>> {
 
   const raw = await env.WAKE_KV.get(LAST_SEEN_KEY)
   if (!raw) {
-    // No activity recorded: if still running, stop (avoids forever-on with empty KV)
     const state = await getInstanceState(env)
     if (state !== 'running') {
       return { action: 'skip', reason: 'no-lastSeen', state }
@@ -288,9 +295,8 @@ async function isOriginUp(env: Env): Promise<boolean> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ORIGIN_TIMEOUT_MS)
   try {
-    // cacheTtl 0: stale cached /api/health must not look "up" while EC2 is stopped
     const res = await fetch(
-      `https://academistream.online${HEALTH_PATH}?wakeHealth=${Date.now()}`,
+      `https://academistream.online${HEALTH_PATH}?t=${Date.now()}`,
       {
         method: 'GET',
         redirect: 'manual',
@@ -336,8 +342,22 @@ async function proxyToOrigin(request: Request, env: Env): Promise<Response> {
   }
 
   const res = await fetch(originUrl, init)
-  const out = new Headers(res.headers)
-  out.set('Cache-Control', 'no-store')
+  const out = noStoreHeaders()
+  res.headers.forEach((value, key) => {
+    const lower = key.toLowerCase()
+    if (
+      lower === 'cache-control' ||
+      lower === 'cdn-cache-control' ||
+      lower === 'cloudflare-cdn-cache-control' ||
+      lower === 'expires' ||
+      lower === 'pragma' ||
+      lower === 'etag' ||
+      lower === 'last-modified'
+    ) {
+      return
+    }
+    out.set(key, value)
+  })
   return new Response(res.body, {
     status: res.status,
     statusText: res.statusText,
@@ -418,6 +438,7 @@ function waitingPageResponse(startResult = 'unknown'): Response {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store" />
   <title>Starting Academistream</title>
   <style>
     :root {
@@ -498,15 +519,10 @@ function waitingPageResponse(startResult = 'unknown'): Response {
 </body>
 </html>`
 
-  return new Response(html, {
-    status: 503,
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-store, no-cache, must-revalidate',
-      Pragma: 'no-cache',
-      Expires: '0',
-      'Retry-After': '30',
-      'X-Academistream-Wake': startResult,
-    },
+  const headers = noStoreHeaders({
+    'Content-Type': 'text/html; charset=utf-8',
+    'Retry-After': '30',
+    'X-Academistream-Wake': startResult,
   })
+  return new Response(html, { status: 503, headers })
 }
