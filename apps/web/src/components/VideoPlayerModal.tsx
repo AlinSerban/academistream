@@ -99,10 +99,9 @@ export function VideoPlayerModal({
 
             {playbackUrl && !playable ? (
               <p className="watch-modal-status">
-                Inline playback needs HTTPS. Open URL:{' '}
-                <a className="link-accent break-all" href={playbackUrl}>
-                  {playbackUrl}
-                </a>
+                Inline playback needs an HTTPS media URL. Retry after the
+                demo media pipeline finishes, or open this video from a
+                desktop browser once storage is configured for signed HTTPS.
               </p>
             ) : null}
           </div>

@@ -116,7 +116,8 @@ function InviteSection() {
         <p className="panel-empty">No pending invites.</p>
       ) : (
         <>
-          <table className="data-table data-table-zebra">
+          <div className="table-scroll">
+            <table className="data-table data-table-zebra">
             <thead>
               <tr>
                 <th className="col-id">ID</th>
@@ -151,6 +152,7 @@ function InviteSection() {
               ))}
             </tbody>
           </table>
+          </div>
           <PaginationControls
             page={page}
             pageSize={PAGE_SIZE}
@@ -251,7 +253,8 @@ function MembersSection() {
         <p className="panel-empty">No members.</p>
       ) : (
         <>
-          <table className="data-table data-table-zebra">
+          <div className="table-scroll">
+            <table className="data-table data-table-zebra">
             <thead>
               <tr>
                 <th>Name</th>
@@ -282,6 +285,7 @@ function MembersSection() {
               ))}
             </tbody>
           </table>
+          </div>
           <PaginationControls
             page={page}
             pageSize={PAGE_SIZE}
@@ -441,7 +445,8 @@ function AuditSection() {
       ) : (
         <>
           <p className="text-muted px-5 pt-3 text-sm">Newest first for this tenant.</p>
-          <table className="data-table data-table-zebra">
+          <div className="table-scroll">
+            <table className="data-table data-table-zebra">
             <thead>
               <tr>
                 <th>Action</th>
@@ -465,6 +470,7 @@ function AuditSection() {
               ))}
             </tbody>
           </table>
+          </div>
           <PaginationControls
             page={page}
             pageSize={PAGE_SIZE}

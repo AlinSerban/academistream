@@ -276,6 +276,14 @@ html {
     flex-shrink: 0;
   }
 
+  /* Compact percent / short fields must not inherit the 12rem min-width. */
+  .form-row-controls .input.input-compact,
+  .learner-assign-controls .input {
+    flex: 0 0 auto;
+    min-width: 0;
+    width: 5rem;
+  }
+
   .panel {
     background: var(--surface);
     border: 1px solid var(--line);
@@ -284,6 +292,17 @@ html {
     margin: 0 0 20px;
     padding: 0;
     box-shadow: var(--shadow-panel);
+  }
+
+  /* Keep wide tables usable instead of clipping action links. */
+  .table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-scroll .data-table {
+    min-width: 36rem;
   }
 
   .panel:last-child {
@@ -614,6 +633,48 @@ html {
     box-shadow: var(--shadow-panel);
     position: sticky;
     top: 24px;
+  }
+
+  @media (max-width: 900px) {
+    .app-layout {
+      flex-direction: column;
+      padding: 16px;
+      gap: 16px;
+    }
+
+    .app-sidebar {
+      width: 100%;
+      position: static;
+    }
+
+    .sidebar-nav {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .nav-link {
+      margin: 0;
+    }
+
+    .sidebar-footer {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .sidebar-logout {
+      width: auto;
+      margin: 0;
+    }
+
+    .page-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .page-header-meta {
+      justify-content: flex-start;
+    }
   }
 
   .sidebar-brand {
@@ -1551,6 +1612,7 @@ html {
     align-items: center;
     gap: 8px 10px;
     min-width: 0;
+    flex: 1;
   }
 
   .learner-assign-title {
@@ -1559,10 +1621,21 @@ html {
     font-weight: 600;
     color: var(--ink);
     line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .learner-assign-top .btn {
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .learner-assign-controls {
     align-items: center;
+    gap: 8px;
+  }
+
+  .learner-assign-controls .btn {
+    white-space: nowrap;
   }
 
   @media (max-width: 720px) {
@@ -1589,6 +1662,10 @@ html {
     }
 
     .learner-assign-top .btn {
+      width: 100%;
+    }
+
+    .learner-assign-controls {
       width: 100%;
     }
 

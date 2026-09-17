@@ -217,6 +217,7 @@ export function LibraryPage() {
           <p className="panel-empty">No courses yet. Create one below.</p>
         ) : (
           <>
+            <div className="table-scroll">
             <table className="data-table data-table-zebra">
               <thead>
                 <tr>
@@ -255,6 +256,7 @@ export function LibraryPage() {
                 )}
               </tbody>
             </table>
+          </div>
 
             <PaginationControls
               page={coursePage}
@@ -406,6 +408,7 @@ export function LibraryPage() {
           <p className="panel-empty">No videos yet.</p>
         ) : (
           <>
+            <div className="table-scroll">
             <table className="data-table data-table-zebra">
               <thead>
                 <tr>
@@ -447,6 +450,7 @@ export function LibraryPage() {
                 )}
               </tbody>
             </table>
+          </div>
 
             <PaginationControls
               page={videoPage}

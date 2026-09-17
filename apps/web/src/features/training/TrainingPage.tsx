@@ -224,6 +224,7 @@ function StaffTraining() {
           <p className="panel-empty">None yet.</p>
         ) : (
           <>
+            <div className="table-scroll">
             <table className="data-table data-table-zebra">
               <thead>
                 <tr>
@@ -244,6 +245,7 @@ function StaffTraining() {
                 ))}
               </tbody>
             </table>
+          </div>
             <PaginationControls
               page={assignPage}
               pageSize={PAGE_SIZE}
@@ -267,6 +269,7 @@ function StaffTraining() {
           <p className="panel-empty">No progress rows.</p>
         ) : (
           <>
+            <div className="table-scroll">
             <table className="data-table data-table-zebra">
               <thead>
                 <tr>
@@ -287,6 +290,7 @@ function StaffTraining() {
                 ))}
               </tbody>
             </table>
+          </div>
             <PaginationControls
               page={progressPage}
               pageSize={PAGE_SIZE}
@@ -311,6 +315,7 @@ function StaffTraining() {
           <p className="panel-empty">No completions yet.</p>
         ) : (
           <>
+            <div className="table-scroll">
             <table className="data-table data-table-zebra">
               <thead>
                 <tr>
@@ -333,6 +338,7 @@ function StaffTraining() {
                 ))}
               </tbody>
             </table>
+          </div>
             <PaginationControls
               page={completionsPage}
               pageSize={PAGE_SIZE}
