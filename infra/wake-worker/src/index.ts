@@ -18,7 +18,7 @@ export interface Env {
 const HEALTH_PATH = '/api/health'
 const STATUS_PATH = '/__wake/status'
 const IDLE_TICK_PATH = '/__wake/idle-tick'
-const ORIGIN_TIMEOUT_MS = 2500
+const ORIGIN_TIMEOUT_MS = 8000
 const LAST_SEEN_KEY = 'lastSeenMs'
 const DEFAULT_IDLE_MINUTES = 20
 /** Cap KV writes: at most one lastSeen update per this window (reads are cheaper). */
@@ -29,8 +29,9 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === STATUS_PATH) {
+      const state = await getInstanceState(env)
       const up = await isOriginUp(env)
-      return jsonNoStore({ up })
+      return jsonNoStore({ up, state })
     }
 
     if (url.pathname === IDLE_TICK_PATH) {
@@ -39,6 +40,11 @@ export default {
       }
       const result = await maybeStopIfIdle(env)
       return jsonNoStore(result)
+    }
+
+    // Always try origin for health — must not run isOriginUp (recursion) or asleep HTML.
+    if (url.pathname === HEALTH_PATH) {
+      return proxyHealth(env)
     }
 
     if (url.pathname.startsWith('/.well-known/')) {
@@ -99,8 +105,9 @@ function noStoreHeaders(extra?: Record<string, string>): Headers {
   return headers
 }
 
-function jsonNoStore(body: unknown): Response {
+function jsonNoStore(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
+    status,
     headers: noStoreHeaders({
       'Content-Type': 'application/json',
     }),
@@ -292,11 +299,17 @@ async function stopInstance(env: Env): Promise<boolean> {
 }
 
 async function isOriginUp(env: Env): Promise<boolean> {
+  if (await probeHealth(env, HEALTH_PATH)) return true
+  // Some deploys expose Nest health without the /api prefix.
+  return probeHealth(env, '/health')
+}
+
+async function probeHealth(env: Env, path: string): Promise<boolean> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ORIGIN_TIMEOUT_MS)
   try {
     const res = await fetch(
-      `https://academistream.online${HEALTH_PATH}?t=${Date.now()}`,
+      `https://academistream.online${path}?t=${Date.now()}`,
       {
         method: 'GET',
         redirect: 'manual',
@@ -313,6 +326,27 @@ async function isOriginUp(env: Env): Promise<boolean> {
     return false
   } finally {
     clearTimeout(timer)
+  }
+}
+
+/** Proxy /api/health to origin; used by browser polls and avoids Worker asleep HTML. */
+async function proxyHealth(env: Env): Promise<Response> {
+  try {
+    const res = await fetch(
+      `https://academistream.online${HEALTH_PATH}?t=${Date.now()}`,
+      {
+        method: 'GET',
+        redirect: 'manual',
+        cache: 'no-store',
+        cf: { resolveOverride: env.ORIGIN_IP, cacheTtl: 0 },
+        headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+      } as RequestInit,
+    )
+    const text = await res.text()
+    const headers = noStoreHeaders({ 'Content-Type': 'application/json' })
+    return new Response(text, { status: res.status, headers })
+  } catch {
+    return jsonNoStore({ status: 'down' }, 503)
   }
 }
 
@@ -501,11 +535,24 @@ function waitingPageResponse(startResult = 'unknown'): Response {
     async function tick() {
       n += 1;
       try {
-        const res = await fetch('/__wake/status', { cache: 'no-store' });
-        const data = await res.json();
-        if (data.up) {
+        const [statusRes, healthRes] = await Promise.all([
+          fetch('/__wake/status', { cache: 'no-store' }),
+          fetch('/api/health?t=' + Date.now(), { cache: 'no-store' }),
+        ]);
+        const data = await statusRes.json();
+        let healthOk = false;
+        try {
+          const health = await healthRes.json();
+          healthOk = health && health.status === 'ok';
+        } catch (_) {}
+        if (data.up || healthOk) {
           statusEl.textContent = 'Ready, loading…';
           location.replace('/');
+          return;
+        }
+        if (data.state === 'pending' || data.state === 'running') {
+          statusEl.textContent = 'Instance ' + data.state + ', waiting for app… ' + (n * 3) + 's';
+          setTimeout(tick, 3000);
           return;
         }
       } catch (_) {}
@@ -514,7 +561,7 @@ function waitingPageResponse(startResult = 'unknown'): Response {
       statusEl.textContent = 'Still starting… ' + mins + 'm ' + secs + 's';
       setTimeout(tick, 3000);
     }
-    setTimeout(tick, 3000);
+    setTimeout(tick, 2000);
   </script>
 </body>
 </html>`
