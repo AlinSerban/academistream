@@ -18,6 +18,7 @@ export interface Env {
 const HEALTH_PATH = '/api/health'
 const STATUS_PATH = '/__wake/status'
 const IDLE_TICK_PATH = '/__wake/idle-tick'
+const WAKE_START_PATH = '/__wake/start'
 const ORIGIN_TIMEOUT_MS = 2500
 const LAST_SEEN_KEY = 'lastSeenMs'
 const DEFAULT_IDLE_MINUTES = 20
@@ -46,6 +47,22 @@ export default {
       return Response.json(result, { headers: { 'Cache-Control': 'no-store' } })
     }
 
+    // Dedicated wake URL (not "/") so browsers cannot serve a cached SPA shell.
+    if (url.pathname === WAKE_START_PATH) {
+      if (!hasValidWakeGate(url, env)) {
+        return asleepPageResponse()
+      }
+      const state = await getInstanceState(env)
+      const up = await isOriginUp(env)
+      // Only skip StartInstances when AWS says running/pending AND health is up.
+      if (up && (state === 'running' || state === 'pending')) {
+        return Response.redirect('https://academistream.online/', 302)
+      }
+      const startResult = await ensureInstanceStarted(env)
+      ctx.waitUntil(touchLastSeen(env, { force: true }))
+      return waitingPageResponse(startResult)
+    }
+
     // Let ACME / other challenges through when origin is reachable
     if (url.pathname.startsWith('/.well-known/')) {
       if (await isOriginUp(env)) {
@@ -54,17 +71,12 @@ export default {
       return new Response('Origin offline', { status: 503 })
     }
 
-    const wake = hasValidWakeGate(url, env)
-
-    // Wake link: trust AWS instance state, not only /api/health (stale cache / race).
-    if (wake) {
-      const state = await getInstanceState(env)
-      const up = await isOriginUp(env)
-      if (!up || (state !== 'running' && state !== 'pending')) {
-        const startResult = await ensureInstanceStarted(env)
-        ctx.waitUntil(touchLastSeen(env, { force: true }))
-        return waitingPageResponse(startResult)
-      }
+    // Old README style /?wake=true → canonical wake path (avoids cached "/")
+    if (url.pathname === '/' && hasValidWakeGate(url, env)) {
+      return Response.redirect(
+        `https://academistream.online${WAKE_START_PATH}?wake=${encodeURIComponent(env.WAKE_GATE)}`,
+        302,
+      )
     }
 
     if (await isOriginUp(env)) {
@@ -74,13 +86,7 @@ export default {
       return proxyToOrigin(request, env)
     }
 
-    if (!wake) {
-      return asleepPageResponse()
-    }
-
-    const startResult = await ensureInstanceStarted(env)
-    ctx.waitUntil(touchLastSeen(env, { force: true }))
-    return waitingPageResponse(startResult)
+    return asleepPageResponse()
   },
 
   // Runs inside Cloudflare (not HTTP) — not blocked by Bot Fight Mode.
@@ -283,14 +289,17 @@ async function isOriginUp(env: Env): Promise<boolean> {
   const timer = setTimeout(() => controller.abort(), ORIGIN_TIMEOUT_MS)
   try {
     // cacheTtl 0: stale cached /api/health must not look "up" while EC2 is stopped
-    const res = await fetch(`https://academistream.online${HEALTH_PATH}`, {
-      method: 'GET',
-      redirect: 'manual',
-      signal: controller.signal,
-      cache: 'no-store',
-      cf: { resolveOverride: env.ORIGIN_IP, cacheTtl: 0 },
-      headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
-    } as RequestInit)
+    const res = await fetch(
+      `https://academistream.online${HEALTH_PATH}?wakeHealth=${Date.now()}`,
+      {
+        method: 'GET',
+        redirect: 'manual',
+        signal: controller.signal,
+        cache: 'no-store',
+        cf: { resolveOverride: env.ORIGIN_IP, cacheTtl: 0 },
+        headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+      } as RequestInit,
+    )
     if (!res.ok) return false
     const body = (await res.json()) as { status?: string }
     return body.status === 'ok'
@@ -475,7 +484,7 @@ function waitingPageResponse(startResult = 'unknown'): Response {
         const data = await res.json();
         if (data.up) {
           statusEl.textContent = 'Ready, loading…';
-          location.reload();
+          location.replace('/');
           return;
         }
       } catch (_) {}
@@ -493,7 +502,9 @@ function waitingPageResponse(startResult = 'unknown'): Response {
     status: 503,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-store',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
       'Retry-After': '30',
       'X-Academistream-Wake': startResult,
     },

@@ -162,7 +162,7 @@ See also: `.env.aws.example` for a copy-paste AWS env block.
 
 ## Hosted demo
 
-**URL:** https://academistream.online/?wake=true  
+**URL:** https://academistream.online/__wake/start?wake=true  
 
 Use that full link (the `wake` query param). Opening the bare domain while the VM is stopped will not start it — that keeps random crawlers from burning EC2 time.
 
