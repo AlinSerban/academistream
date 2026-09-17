@@ -104,7 +104,7 @@ Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: l
 
 **AWS S3:** set `STORAGE_PROVIDER=s3` with `S3_BUCKET` and `AWS_REGION` (from `infra/terraform` outputs; see `infra/terraform/README.md`). Uploads use `PutObject`; playback uses S3 presigned GET unless CloudFront is configured.
 
-**CloudFront playback (optional):** set `CLOUDFRONT_DOMAIN`, `CLOUDFRONT_KEY_PAIR_ID`, and `CLOUDFRONT_PRIVATE_KEY_PATH` for signed CDN URLs (distribution must use OAC to the private bucket — see `infra/terraform/README.md`). Without CloudFront vars, playback falls back to S3 presigned or local `file://` URLs.
+**CloudFront playback (optional):** set `CLOUDFRONT_DOMAIN`, `CLOUDFRONT_KEY_PAIR_ID`, and `CLOUDFRONT_PRIVATE_KEY_PATH` for signed CDN URLs (distribution must use OAC to the private bucket — see `infra/terraform/README.md`). Without CloudFront vars, playback falls back to S3 presigned (when `s3`) or signed `/api/local-media` (when `local` + `WEB_ORIGIN`).
 
 ### Video upload + Kafka + worker
 
@@ -112,20 +112,33 @@ Object bytes go through a storage adapter (`apps/api/src/storage`). **Default: l
 
 `npm run worker:dev` runs the consumer: it updates the same Postgres (`DATABASE_URL`) via `@academistream/db`, sets `processing`, then either **submits MediaConvert** (`STORAGE_PROVIDER=s3`) and stores `mediaconvert_job_id`, or on **local disk** checks the file exists and sets `ready` + `playback_key`. A worker **poll loop** (`GetJob`, default every 15s) marks AWS jobs `ready` with the transcoded `playback_key` or `failed`. SNS/EventBridge completion is the documented scale path (see `docs/engineering/SCALE_PATH.md`).
 
-`GET /videos/:id/playback` returns a short-lived URL (`{ url, expiresIn: 3600 }`) for `ready` videos — local `file://`, S3 presigned, or **CloudFront signed** when `CLOUDFRONT_*` env vars are set. Uses `playbackKey` when present (transcoded output). Learners may only play `published` content; admin/instructor can play drafts. Cross-tenant and not-ready → 4xx.
+`GET /videos/:id/playback` returns a short-lived URL (`{ url, expiresIn: 3600 }`) for `ready` videos — **signed HTTPS `/api/local-media` when `STORAGE_PROVIDER=local` and `WEB_ORIGIN` is set**, S3 presigned, or **CloudFront signed** when `CLOUDFRONT_*` env vars are set. Uses `playbackKey` when present (transcoded output). Learners may only play `published` content; admin/instructor can play drafts. Cross-tenant and not-ready → 4xx.
 
-The library page (`/`) polls video list every **2 seconds** while any video is `queued` or `processing`, then stops when all are `ready` or `failed`. Click **Play** on a ready video to fetch the signed URL; HTTPS URLs (S3/CloudFront) play inline in `<video>`; local `file://` URLs show a path hint only (browser security).
+The library page (`/`) polls video list every **2 seconds** while any video is `queued` or `processing`, then stops when all are `ready` or `failed`. Click **Play** on a ready video to fetch the signed URL; HTTPS URLs play inline in `<video>`.
+
+### Choosing a media mode
+
+| Mode | `STORAGE_PROVIDER` | Upload / process | Playback | Typical use |
+|------|--------------------|------------------|----------|-------------|
+| **Local** | `local` (default) | Disk under `STORAGE_LOCAL_ROOT`; worker checks file → `ready` (**no MediaConvert**) | Signed `https://…/api/local-media?…` when `WEB_ORIGIN` + `JWT_SECRET` are set | Laptop, CI, **cheap hosted demo** |
+| **AWS** | `s3` | S3 `PutObject` + Kafka → MediaConvert CreateJob + poller → `ready` | S3 presigned GET, or CloudFront signed if `CLOUDFRONT_*` set | Real media pipeline / UAT / prod-shaped demos |
+
+**Same UI status labels** (`queued` → `processing` → `ready`) in both modes — do not read “processing” on the hosted demo as MediaConvert unless the host is on `s3`.
+
+**Switch to AWS on a host:** Terraform apply → put outputs in `.env` → set `STORAGE_PROVIDER=s3`, `AWS_REGION`, `S3_BUCKET`, `MEDIACONVERT_ROLE` on **API and worker** → restart both. Optional CloudFront vars. Details below and in `infra/terraform/README.md` / `.env.aws.example`.
+
+**Switch back to local:** `STORAGE_PROVIDER=local`, keep `STORAGE_LOCAL_ROOT` + `WEB_ORIGIN`, restart API and worker. No MediaConvert charges.
 
 ### Demo: local vs AWS
 
-#### Local path (default — dev / CI)
+#### Local path (default — dev / CI / current hosted demo)
 
 1. `cp .env.example .env` — keep `STORAGE_PROVIDER=local`.
 2. `docker compose up -d`, migrate, seed.
 3. Run API, worker, and web (`npm run api:dev`, `npm run worker:dev`, `npm run web:dev`).
 4. Sign in as `instructor@acme.local`, open `/`, create course + upload a small MP4.
-5. **Status flow:** `queued` → `processing` (brief) → `ready` (worker checks file on disk under `.data/media`).
-6. Publish the video (API), then **Play** — playback URL is `file://` (not inline in browser; path shown on page).
+5. **Status flow:** `queued` → `processing` (brief) → `ready` (worker checks file on disk under `.data/media` — **not** MediaConvert).
+6. Publish the video, then **Play** / learner **Watch** — inline playback via signed `/api/local-media` when `WEB_ORIGIN` points at the site.
 
 #### AWS path (S3 + MediaConvert + optional CloudFront)
 
@@ -172,8 +185,8 @@ B2B training-video demo on **EC2 t3.small** (eu-central-1) + Docker Compose + Ca
 |--|--|
 | Cold start | Open the wake URL above; “Starting the demo…” (~1–2 min), then the app |
 | Auto-stop | Cloudflare Worker cron every **20 minutes** stops EC2 when there was no page visit for **20 minutes** |
-| Media | Local disk on the instance (S3 optional; see AWS path above) |
-| Cost | Pay compute only while running; keep the **Elastic IP**; EBS still bills when stopped |
+| Media | **`STORAGE_PROVIDER=local` on the instance** — disk under `.data/media`, signed HTTPS `/api/local-media` for `<video>`. **MediaConvert is not used on this host** (keeps cost low). S3 + MediaConvert remain available when you set `STORAGE_PROVIDER=s3` (see **Choosing a media mode** above) |
+| Cost | Pay compute only while running; keep the **Elastic IP**; EBS still bills when stopped; no MediaConvert minutes while on local |
 
 **Demo logins** (seed only — not production): password `Password123!`
 
@@ -181,7 +194,7 @@ B2B training-video demo on **EC2 t3.small** (eu-central-1) + Docker Compose + Ca
 - Acme instructor: `instructor@acme.local`
 - Acme learner: `learner@acme.local`
 
-Wake Worker setup: `infra/wake-worker/README.md`.
+Wake Worker setup: `infra/wake-worker/README.md`. Outreach screenshots (marked / unmarked): `docs/demo-screenshots/`.
 
 ## Environments
 

@@ -48,18 +48,18 @@ export default {
     }
 
     if (url.pathname.startsWith('/.well-known/')) {
-      if (await isOriginUp(env)) {
+      if (await shouldProxyToOrigin(env)) {
         return proxyToOrigin(request, env)
       }
       return new Response('Origin offline', { status: 503, headers: noStoreHeaders() })
     }
 
-    // Real fix for "login without start": never cache HTML; wake link always hits this Worker.
+    // Wake link: start if needed, or go straight to the app when EC2 is already running.
     if (hasValidWakeGate(url, env)) {
       return handleWakeRequest(env, ctx)
     }
 
-    if (await isOriginUp(env)) {
+    if (await shouldProxyToOrigin(env)) {
       if (isBrowserNavigation(request)) {
         ctx.waitUntil(touchLastSeen(env))
       }
@@ -78,16 +78,29 @@ export default {
   },
 }
 
+/** EC2 running/pending is enough to proxy — do not block on /api/health. */
+async function shouldProxyToOrigin(env: Env): Promise<boolean> {
+  if (await isOriginUp(env)) return true
+  const state = await getInstanceState(env)
+  return state === 'running' || state === 'pending'
+}
+
 /** Start EC2 if needed, else send the browser to the app. Always no-store. */
 async function handleWakeRequest(
   env: Env,
   ctx: ExecutionContext,
 ): Promise<Response> {
   const state = await getInstanceState(env)
-  const up = await isOriginUp(env)
 
-  if (up && (state === 'running' || state === 'pending')) {
+  // Instance already up → send browser to / (health can lag behind AWS state).
+  if (state === 'running') {
+    ctx.waitUntil(touchLastSeen(env, { force: true }))
     return noStoreRedirect('https://academistream.online/')
+  }
+
+  if (state === 'pending') {
+    ctx.waitUntil(touchLastSeen(env, { force: true }))
+    return waitingPageResponse('already-pending')
   }
 
   const startResult = await ensureInstanceStarted(env)
@@ -314,7 +327,7 @@ async function probeHealth(env: Env, path: string): Promise<boolean> {
         method: 'GET',
         redirect: 'manual',
         signal: controller.signal,
-        cache: 'no-store',
+        // Do not set cache:'no-store' with cf.cacheTtl — Workers throws TypeError.
         cf: { resolveOverride: env.ORIGIN_IP, cacheTtl: 0 },
         headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
       } as RequestInit,
@@ -337,7 +350,7 @@ async function proxyHealth(env: Env): Promise<Response> {
       {
         method: 'GET',
         redirect: 'manual',
-        cache: 'no-store',
+        // Do not set cache:'no-store' with cf.cacheTtl — Workers throws TypeError.
         cf: { resolveOverride: env.ORIGIN_IP, cacheTtl: 0 },
         headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
       } as RequestInit,
@@ -361,11 +374,11 @@ async function proxyToOrigin(request: Request, env: Env): Promise<Response> {
   headers.delete('cf-visitor')
   headers.delete('cf-worker')
 
+  // Do not set cache:'no-store' with cf.cacheTtl — Workers throws TypeError (Error 1101).
   const init: RequestInit = {
     method: request.method,
     headers,
     redirect: 'manual',
-    cache: 'no-store',
     cf: { resolveOverride: env.ORIGIN_IP, cacheTtl: 0 },
   } as RequestInit
 
@@ -545,13 +558,13 @@ function waitingPageResponse(startResult = 'unknown'): Response {
           const health = await healthRes.json();
           healthOk = health && health.status === 'ok';
         } catch (_) {}
-        if (data.up || healthOk) {
+        if (data.up || healthOk || data.state === 'running') {
           statusEl.textContent = 'Ready, loading…';
           location.replace('/');
           return;
         }
-        if (data.state === 'pending' || data.state === 'running') {
-          statusEl.textContent = 'Instance ' + data.state + ', waiting for app… ' + (n * 3) + 's';
+        if (data.state === 'pending') {
+          statusEl.textContent = 'Instance pending, waiting for app… ' + (n * 3) + 's';
           setTimeout(tick, 3000);
           return;
         }
