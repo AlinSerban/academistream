@@ -8,15 +8,16 @@ import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcrypt';
+import type { Response } from 'express';
 
 describe('AuthService', () => {
   let service: AuthService;
   let usersService: {
-    findUser: jest.Mock
-    findUserById: jest.Mock
-    findMembershipsByUserId: jest.Mock
+    findUser: jest.Mock;
+    findUserById: jest.Mock;
+    findMembershipsByUserId: jest.Mock;
   };
-  let jwtService: { signAsync: jest.Mock, verifyAsync: jest.Mock }
+  let jwtService: { signAsync: jest.Mock; verifyAsync: jest.Mock };
 
   beforeEach(async () => {
     usersService = {
@@ -32,14 +33,8 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
-        {
-          provide: UsersService,
-          useValue: usersService
-        },
-        {
-          provide: JwtService,
-          useValue: jwtService
-        }
+        { provide: UsersService, useValue: usersService },
+        { provide: JwtService, useValue: jwtService },
       ],
     }).compile();
 
@@ -48,10 +43,10 @@ describe('AuthService', () => {
 
   it('throws if user not found', async () => {
     usersService.findUser.mockResolvedValue(undefined);
-    await expect(service.signIn('a@b.com', 'x', {} as any))
-      .rejects.toThrow(UnauthorizedException);
+    await expect(
+      service.signIn('a@b.com', 'x', {} as Response),
+    ).rejects.toThrow(UnauthorizedException);
   });
-
 
   it('throws if password does not match', async () => {
     const user = {
@@ -59,15 +54,15 @@ describe('AuthService', () => {
       passwordHash: 'test123',
       name: 'John',
       email: 'John@gmail.com',
-      isPlatformAdmin: true
-    }
+      isPlatformAdmin: true,
+    };
 
     usersService.findUser.mockResolvedValue(user);
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-    await expect(service.signIn('John@gmail.com', 'x', {} as any))
-      .rejects.toThrow(UnauthorizedException);
-
+    await expect(
+      service.signIn('John@gmail.com', 'x', {} as Response),
+    ).rejects.toThrow(UnauthorizedException);
   });
 
   it('logs in', async () => {
@@ -76,29 +71,27 @@ describe('AuthService', () => {
       passwordHash: 'test123',
       name: 'John',
       email: 'John@gmail.com',
-      isPlatformAdmin: false
-    }
+      isPlatformAdmin: false,
+    };
 
-    const res = { cookie: jest.fn() };
-
+    const res = { cookie: jest.fn() } as unknown as Response;
 
     usersService.findUser.mockResolvedValue(user);
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-
     usersService.findMembershipsByUserId.mockResolvedValue([]);
     jwtService.signAsync
       .mockResolvedValueOnce('refresh-token')
       .mockResolvedValueOnce('access-token');
 
-    await expect(service.signIn('John@gmail.com', 'x', res as any))
-      .resolves.toEqual({ access_token: 'access-token' });
+    await expect(service.signIn('John@gmail.com', 'x', res)).resolves.toEqual({
+      access_token: 'access-token',
+    });
 
     expect(res.cookie).toHaveBeenCalledWith(
       'refresh_token',
       'refresh-token',
-      expect.any(Object)
-    )
-
+      expect.any(Object),
+    );
   });
 
   it('refresh preserves roles and isPlatformAdmin in access token', async () => {

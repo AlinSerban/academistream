@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import type { ConfigService } from '@nestjs/config';
 import { CloudFrontPlaybackSigner } from './cloudfront-playback.signer';
-import { resolveMonorepoRoot } from './resolve-storage-root';
+import { resolveMonorepoRoot } from '@academistream/shared';
 
 export function createCloudFrontPlaybackSigner(
     config: ConfigService,

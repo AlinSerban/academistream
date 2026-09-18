@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { LocalMailerService } from './local.mailer'
+import { LocalMailerService } from '@academistream/shared'
 
 export const MAIL = Symbol('MAIL')
 

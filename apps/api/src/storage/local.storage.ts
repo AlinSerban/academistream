@@ -34,7 +34,6 @@ export class LocalStorageService implements StorageService {
      */
     async getSignedGetUrl(key: string, expiresInSeconds = 3600): Promise<string> {
         assertValidStorageKey(key);
-        // Ensure key stays under the storage root (rejects traversal).
         this.resolveSafePath(key);
 
         const base = this.options.publicBaseUrl?.trim()

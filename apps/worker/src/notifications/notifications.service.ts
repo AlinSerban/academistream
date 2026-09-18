@@ -4,7 +4,7 @@ import { notifications, tenantMemberships } from '@academistream/db'
 import { and, eq } from 'drizzle-orm'
 import { DRIZZLE } from '../db/db.module'
 import { MAIL } from '../mail/mail.module'
-import type { MailService } from '../mail/mail.types'
+import type { MailService } from '@academistream/shared'
 
 @Injectable()
 export class NotificationsService {

@@ -1,7 +1,7 @@
 import type { ConfigService } from '@nestjs/config';
 import { LocalStorageService } from './local.storage';
 import { S3StorageService } from './s3.storage';
-import { resolveStorageRoot } from './resolve-storage-root';
+import { resolveStorageRoot } from '@academistream/shared';
 import type { StorageService } from './storage.types';
 
 export function createStorageService(config: ConfigService): StorageService {

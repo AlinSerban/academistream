@@ -3,10 +3,16 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { LoginRateLimitService } from './login-rate-limit.service';
 import type { Response, Request } from 'express';
+import type { JwtPayload, SignInDto } from './types';
 
 describe('AuthController', () => {
   let controller: AuthController;
-  let authService: { signIn: jest.Mock, refresh: jest.Mock, signOut: jest.Mock, getMe: jest.Mock };
+  let authService: {
+    signIn: jest.Mock;
+    refresh: jest.Mock;
+    signOut: jest.Mock;
+    getMe: jest.Mock;
+  };
   let loginRateLimit: { assertAllowed: jest.Mock };
 
   beforeEach(async () => {
@@ -14,30 +20,24 @@ describe('AuthController', () => {
       signIn: jest.fn(),
       refresh: jest.fn(),
       signOut: jest.fn(),
-      getMe: jest.fn()
-    }
-    loginRateLimit = { assertAllowed: jest.fn().mockResolvedValue(undefined) }
+      getMe: jest.fn(),
+    };
+    loginRateLimit = { assertAllowed: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
-        {
-          provide: AuthService,
-          useValue: authService
-        },
-        {
-          provide: LoginRateLimitService,
-          useValue: loginRateLimit,
-        },
-      ]
+        { provide: AuthService, useValue: authService },
+        { provide: LoginRateLimitService, useValue: loginRateLimit },
+      ],
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
   });
 
   it('calls signIn with email, password and res after rate-limit check', async () => {
-    const body = { email: 'a@b.com', password: 'secret' };
-    const req = { ip: '127.0.0.1', headers: {}, socket: {} } as unknown as Request;
+    const body: SignInDto = { email: 'a@b.com', password: 'secret' };
+    const req = { ip: '127.0.0.1', headers: {}, socket: {} } as Request;
     const res = {} as Response;
     const expected = { access_token: 'token' };
 
@@ -51,7 +51,9 @@ describe('AuthController', () => {
   });
 
   it('calls refresh with the cookie token', async () => {
-    const req = { cookies: { refresh_token: 'token' } } as unknown as Request;
+    const req = {
+      cookies: { refresh_token: 'token' },
+    } as Request & { cookies: { refresh_token: string } };
     const expected = { access_token: 'token' };
 
     authService.refresh.mockResolvedValue(expected);
@@ -75,25 +77,26 @@ describe('AuthController', () => {
   });
 
   it('calls getMe with user id', async () => {
-    const req = { user: { sub: 1, username: 'John' } } as unknown as Request;
-    const user = req.user as { sub: number, username: string }
+    const payload: JwtPayload = {
+      sub: 1,
+      username: 'John',
+      isPlatformAdmin: false,
+      roles: [],
+    };
+    const req = { user: payload } as Request;
     const expected = {
-      id: user.sub,
-      name: user.username,
+      id: 1,
+      name: 'John',
       email: 'John@gmail.com',
-      isPlatformAdmin: 'true',
-      memberships: {}
-    }
+      isPlatformAdmin: false,
+      memberships: [],
+    };
 
     authService.getMe.mockResolvedValue(expected);
 
     const result = await controller.me(req);
 
-    expect(authService.getMe).toHaveBeenCalledWith(user.sub);
+    expect(authService.getMe).toHaveBeenCalledWith(1);
     expect(result).toEqual(expected);
-
   });
-
-
-
 });

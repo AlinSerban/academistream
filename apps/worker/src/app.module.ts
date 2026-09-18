@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AppService } from './app.service';
 import { DbModule } from './db/db.module';
 import { KafkaConsumerService } from './kafka/kafka.consumer';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -19,7 +18,6 @@ import { KafkaProducerService } from './kafka/kafka.producer';
     NotificationsModule
   ],
   providers: [
-    AppService,
     VideoProcessingService,
     KafkaConsumerService,
     MediaEventsConsumerService,

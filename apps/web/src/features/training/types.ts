@@ -49,3 +49,16 @@ export interface UpsertProgressResponse {
   completion: Completion | null
   threshold: number
 }
+
+/** Mirrors API completion threshold — keep in sync with API training types. */
+export const COMPLETION_PERCENT_THRESHOLD = 90
+
+export const COMPLETION_HINT = `At ${COMPLETION_PERCENT_THRESHOLD}% or above, the assignment is marked complete and progress can no longer be edited.`
+
+export type LearnerStatus = 'completed' | 'in_progress' | 'not_started'
+
+export function learnerStatus(done: boolean, percent: number): LearnerStatus {
+  if (done) return 'completed'
+  if (percent > 0) return 'in_progress'
+  return 'not_started'
+}

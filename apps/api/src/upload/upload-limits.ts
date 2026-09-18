@@ -1,4 +1,3 @@
-/** Default 50 MiB — keeps MediaConvert/S3 demo costs bounded. */
 export const DEFAULT_UPLOAD_MAX_BYTES = 50 * 1024 * 1024
 
 export function resolveUploadMaxBytes(

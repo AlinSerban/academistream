@@ -3,15 +3,7 @@ import type { Db } from '@academistream/db'
 import { auditEvents } from '@academistream/db'
 import { desc, eq } from 'drizzle-orm'
 import { DRIZZLE } from '../db/db.module'
-
-export type AuditAction =
-    | 'assignment.created'
-    | 'completion.created'
-    | 'video.published'
-    | 'invite.created'
-    | 'invite.accepted'
-    | 'invite.revoked'
-    | 'membership.removed'
+import type { AuditRecordInput } from './types'
 
 @Injectable()
 export class AuditService {
@@ -19,18 +11,8 @@ export class AuditService {
 
     constructor(@Inject(DRIZZLE) private readonly db: Db) { }
 
-    /**
-     * Best-effort audit write: failures are logged and never throw,
-     * so primary business actions are not blocked.
-     */
-    async record(input: {
-        tenantId: number
-        actorUserId?: number | null
-        action: AuditAction | string
-        entityType?: string
-        entityId?: number
-        metadata?: Record<string, unknown>
-    }): Promise<void> {
+    /** Best-effort: failures are logged and never throw. */
+    async record(input: AuditRecordInput): Promise<void> {
         try {
             await this.db.insert(auditEvents).values({
                 tenantId: input.tenantId,

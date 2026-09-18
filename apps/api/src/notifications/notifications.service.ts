@@ -4,8 +4,8 @@ import { notifications, tenantMemberships } from '@academistream/db'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { DRIZZLE } from '../db/db.module'
 import { MAIL } from '../mail/mail.module'
-import type { MailService } from '../mail/mail.types'
-import type { NotificationType } from './types'
+import type { MailService } from '@academistream/shared'
+import type { NotifyInput, NotifyTenantStaffInput } from './types'
 
 @Injectable()
 export class NotificationsService {
@@ -16,18 +16,8 @@ export class NotificationsService {
         @Inject(MAIL) private readonly mail: MailService,
     ) { }
 
-    /**
-     * Best-effort in-app notification (+ optional local email).
-     * Failures are logged and never throw, so primary actions are not blocked.
-     *
-     * notifyTenantStaff: first tenant_admin, else first instructor (no uploader on videos).
-     */
-    async notifyTenantStaff(input: {
-        tenantId: number
-        type: NotificationType | string
-        title?: string
-        body?: string
-    }): Promise<void> {
+    /** Best-effort in-app (+ optional email). Failures never throw. */
+    async notifyTenantStaff(input: NotifyTenantStaffInput): Promise<void> {
         const userId = await this.findStaffRecipient(input.tenantId)
         if (userId == null) {
             this.logger.warn(
@@ -38,16 +28,7 @@ export class NotificationsService {
         await this.notify({ ...input, userId })
     }
 
-    async notify(input: {
-        tenantId: number
-        /** Omit for invitee-only email when the user account does not exist yet. */
-        userId?: number
-        type: NotificationType | string
-        title?: string
-        body?: string
-        /** When set, the local mailer logs a would-send. */
-        email?: string
-    }): Promise<void> {
+    async notify(input: NotifyInput): Promise<void> {
         if (input.userId != null) {
             try {
                 await this.db.insert(notifications).values({

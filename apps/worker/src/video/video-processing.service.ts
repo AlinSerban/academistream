@@ -7,7 +7,7 @@ import { eq, and } from 'drizzle-orm';
 import { ConfigService } from '@nestjs/config';
 import { DRIZZLE } from '../db/db.module';
 import { NotificationsService } from '../notifications/notifications.service';
-import { resolveStorageRoot } from '../storage/resolve-storage-root';
+import { resolveStorageRoot } from '@academistream/shared';
 import type { ProcessingMode } from './resolve-processing-mode';
 import { resolveProcessingMode } from './resolve-processing-mode';
 import { KafkaProducerService } from '../kafka/kafka.producer';

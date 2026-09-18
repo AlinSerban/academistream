@@ -14,7 +14,6 @@ import { CompletionsExportService } from './completions-export.service'
 export class ExportsController {
     constructor(private readonly exportService: CompletionsExportService) { }
 
-    /** Tenant admin CSV export of completions. */
     @Roles('tenant_admin')
     @Get('completions.csv')
     @Header('Content-Type', 'text/csv; charset=utf-8')

@@ -1,8 +1,7 @@
 {
   "name": "@academistream/worker",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "description": "Academistream NestJS background worker",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
@@ -21,6 +20,7 @@
   },
   "dependencies": {
     "@academistream/db": "*",
+    "@academistream/shared": "*",
     "@aws-sdk/client-mediaconvert": "^3.1121.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",

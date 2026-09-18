@@ -14,9 +14,6 @@ import type { TenantQuotaStatus, UpdateQuotasInput } from './types'
 export class QuotasService {
     constructor(@Inject(DRIZZLE) private readonly db: Db) { }
 
-    /**
-     * Null maxUsers / maxVideos on the tenant row means unlimited (no enforcement).
-     */
     async assertCanAddMember(tenantId: number): Promise<void> {
         const limits = await this.getTenantLimits(tenantId)
         if (limits.maxUsers == null) return
@@ -27,7 +24,6 @@ export class QuotasService {
         }
     }
 
-    /** Enforced at video create (one DB row per library video). */
     async assertCanAddVideo(tenantId: number): Promise<void> {
         const limits = await this.getTenantLimits(tenantId)
         if (limits.maxVideos == null) return

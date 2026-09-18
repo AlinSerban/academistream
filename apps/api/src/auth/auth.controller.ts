@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import type { Response, Request } from 'express';
 import { Public } from './public.decorator';
 import { LoginRateLimitService } from './login-rate-limit.service';
+import type { JwtPayload, SignInDto } from './types';
 
 @Controller('auth')
 export class AuthController {
@@ -15,13 +16,12 @@ export class AuthController {
     @Public()
     @Post('login')
     async signIn(
-        @Body() signInDto: Record<string, any>,
+        @Body() signInDto: SignInDto,
         @Req() req: Request,
         @Res({ passthrough: true }) res: Response,
     ) {
-        const email = String(signInDto.email ?? '')
-        await this.loginRateLimit.assertAllowed(clientIp(req), email)
-        return this.authService.signIn(email, signInDto.password, res);
+        await this.loginRateLimit.assertAllowed(clientIp(req), signInDto.email)
+        return this.authService.signIn(signInDto.email, signInDto.password, res);
     }
 
     @Public()
@@ -38,7 +38,7 @@ export class AuthController {
 
     @Get('me')
     me(@Req() req: Request) {
-        const user = req.user as { sub: number, username: string }
+        const user = req.user as JwtPayload
         return this.authService.getMe(user.sub);
     }
 

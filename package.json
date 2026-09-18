@@ -18,6 +18,7 @@
     "db:generate": "npm run db:generate -w @academistream/api",
     "db:migrate": "npm run db:migrate -w @academistream/api",
     "db:seed": "npm run db:seed -w @academistream/api",
-    "db:build": "npm run build -w @academistream/db"
+    "db:build": "npm run build -w @academistream/db",
+    "shared:build": "npm run build -w @academistream/shared"
   }
 }

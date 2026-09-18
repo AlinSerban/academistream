@@ -1,5 +1,3 @@
-/** Maps machine event keys to short UI labels. */
-
 const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   'assignment.created': 'Training assigned',
   'completion.created': 'Training completed',
@@ -18,7 +16,6 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
   'membership.removed': 'Member removed',
 }
 
-/** Fallback: `assignment.created` → `Assignment created` */
 export function humanizeEventKey(key: string): string {
   return key
     .split(/[._]+/)

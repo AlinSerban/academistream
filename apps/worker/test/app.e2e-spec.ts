@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from './../src/app.module';
-import { AppService } from './../src/app.service';
+import { VideoProcessingService } from './../src/video/video-processing.service';
 
 describe('Worker AppModule (e2e)', () => {
   it('boots application context', async () => {
@@ -8,7 +8,6 @@ describe('Worker AppModule (e2e)', () => {
       imports: [AppModule],
     }).compile();
 
-    const service = moduleFixture.get(AppService);
-    expect(service.getHello()).toBe('Hello World!');
+    expect(moduleFixture.get(VideoProcessingService)).toBeDefined();
   });
 });

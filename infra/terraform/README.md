@@ -2,7 +2,7 @@
 
 AWS resources for the **media path**: S3 and IAM (MediaConvert role). CloudFront is optional and set up manually (see below).
 
-App hosting stays on EC2 + Docker for the v1 demo; see `docs/engineering/SCALE_PATH.md`.
+App hosting stays on EC2 + Docker for the v1 demo; see `docs/TECHNICAL.md` (scale path).
 
 ## What this stack creates
 
@@ -104,7 +104,7 @@ Terraform does not create the distribution yet. For signed playback:
 
 - **Do not commit** `.terraform/`, `*.tfstate`, or `*.tfstate.backup`.
 - Access keys stay in `~/.aws/credentials`, not in this repo.
-- Optional later: remote state (S3 + DynamoDB lock) — see `docs/engineering/SCALE_PATH.md`.
+- Optional later: remote state (S3 + DynamoDB lock) — see `docs/TECHNICAL.md`.
 
 ## Teardown
 
