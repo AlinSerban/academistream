@@ -1,37 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  PaginationControls,
-  slicePage,
-} from '../../components/PaginationControls'
+import { useEffect, useRef, useState } from 'react'
+import { PaginationControls } from '../../components/PaginationControls'
 import { VideoPlayerModal } from '../../components/VideoPlayerModal'
 import { useToast } from '../../components/Toast'
 import { useLazyGetPlaybackUrlQuery } from '../content/contentApi'
 import {
   useGetMyAssignmentsQuery,
-  useGetMyCompletionsQuery,
-  useGetMyProgressQuery,
   useUpsertProgressMutation,
 } from './trainingApi'
 import {
   COMPLETION_HINT,
   learnerStatus,
-  type Assignment,
+  type MyAssignment,
 } from './types'
 import { ProgressBar, StatusChip } from './trainingUi'
-
-const PAGE_SIZE = 5
+import { DEFAULT_PAGE_SIZE } from '../../lib/pagination'
 
 export function LearnerTraining() {
-  const { data: assignments = [], isLoading } = useGetMyAssignmentsQuery()
-  const { data: progress = [] } = useGetMyProgressQuery()
-  const { data: completions = [] } = useGetMyCompletionsQuery()
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useGetMyAssignmentsQuery({
+    page,
+    pageSize: DEFAULT_PAGE_SIZE,
+  })
   const [upsertProgress, upsertState] = useUpsertProgressMutation()
   const [fetchPlayback, playbackState] = useLazyGetPlaybackUrlQuery()
   const { showToast } = useToast()
   const [percentByVideo, setPercentByVideo] = useState<Record<number, string>>(
     {},
   )
-  const [page, setPage] = useState(1)
   const [watchTarget, setWatchTarget] = useState<{
     videoId: number
     title: string
@@ -40,93 +35,38 @@ export function LearnerTraining() {
   const [playbackError, setPlaybackError] = useState<string | null>(null)
   const watchProgressFloorRef = useRef(0)
 
-  useEffect(() => {
-    setPage(1)
-  }, [assignments.length])
+  const assignments = data?.items ?? []
+  const stats = data?.stats
+  const continueAssignment = data?.continueAssignment ?? null
+  const total = data?.total ?? 0
 
   useEffect(() => {
     setPercentByVideo((prev) => {
       let changed = false
       const next = { ...prev }
-      for (const p of progress) {
-        const server = String(p.percent)
-        if (next[p.videoId] !== server) {
-          next[p.videoId] = server
+      for (const a of assignments) {
+        const server = String(a.percent)
+        if (next[a.videoId] !== server) {
+          next[a.videoId] = server
           changed = true
         }
       }
       return changed ? next : prev
     })
-  }, [progress])
+  }, [assignments])
 
-  const progressByVideo = useMemo(() => {
-    const map = new Map<number, { percent: number; positionSeconds: number }>()
-    for (const p of progress) {
-      map.set(p.videoId, {
-        percent: p.percent,
-        positionSeconds: p.positionSeconds ?? 0,
-      })
-    }
-    return map
-  }, [progress])
-
-  const completedVideos = useMemo(
-    () => new Set(completions.map((c) => c.videoId)),
-    [completions],
-  )
-
-  const sortedAssignments = useMemo(
-    () => [...assignments].sort((a, b) => b.id - a.id),
-    [assignments],
-  )
-
-  const stats = useMemo(() => {
-    let inProgress = 0
-    let completed = 0
-    for (const a of assignments) {
-      const done = completedVideos.has(a.videoId)
-      const percent = progressByVideo.get(a.videoId)?.percent ?? 0
-      if (done) completed += 1
-      else if (percent > 0) inProgress += 1
-    }
-    return {
-      assigned: assignments.length,
-      inProgress,
-      completed,
-      notStarted: Math.max(0, assignments.length - inProgress - completed),
-    }
-  }, [assignments, completedVideos, progressByVideo])
-
-  const continueAssignment = useMemo(() => {
-    const incomplete = sortedAssignments.filter(
-      (a) => !completedVideos.has(a.videoId),
-    )
-    if (incomplete.length === 0) return null
-    const withProgress = incomplete
-      .map((a) => ({
-        assignment: a,
-        percent: progressByVideo.get(a.videoId)?.percent ?? 0,
-      }))
-      .sort((a, b) => b.percent - a.percent || b.assignment.id - a.assignment.id)
-    return withProgress[0] ?? null
-  }, [sortedAssignments, completedVideos, progressByVideo])
-
-  const pagedAssignments = slicePage(sortedAssignments, page, PAGE_SIZE)
-
-  const watchPercent = watchTarget
-    ? (progressByVideo.get(watchTarget.videoId)?.percent ?? 0)
-    : 0
-  const watchDone = watchTarget
-    ? completedVideos.has(watchTarget.videoId)
-    : false
+  const watchRow = watchTarget
+    ? assignments.find((a) => a.videoId === watchTarget.videoId) ??
+      (continueAssignment?.videoId === watchTarget.videoId
+        ? continueAssignment
+        : null)
+    : null
+  const watchPercent = watchRow?.percent ?? 0
+  const watchDone = watchRow?.completed ?? false
   const watchStartAtSeconds =
-    watchTarget && !watchDone
-      ? (progressByVideo.get(watchTarget.videoId)?.positionSeconds ?? 0)
-      : 0
+    watchRow && !watchDone ? watchRow.positionSeconds : 0
   const watchInitialPercent =
-    watchTarget && !watchDone
-      ? (progressByVideo.get(watchTarget.videoId)?.percent ?? 0)
-      : 0
+    watchRow && !watchDone ? watchRow.percent : 0
 
   useEffect(() => {
     if (!watchTarget) return
@@ -148,13 +88,12 @@ export function LearnerTraining() {
     setPlaybackError(null)
   }
 
-  async function openWatch(assignment: Assignment) {
+  async function openWatch(assignment: MyAssignment) {
     const title = assignment.videoTitle ?? `Video #${assignment.videoId}`
     setWatchTarget({ videoId: assignment.videoId, title })
     setPlaybackUrl(null)
     setPlaybackError(null)
-    watchProgressFloorRef.current =
-      progressByVideo.get(assignment.videoId)?.percent ?? 0
+    watchProgressFloorRef.current = assignment.percent
     try {
       const result = await fetchPlayback(assignment.videoId).unwrap()
       setPlaybackUrl(result.url)
@@ -168,7 +107,7 @@ export function LearnerTraining() {
     positionSeconds: number
   }) {
     if (!watchTarget) return
-    if (completedVideos.has(watchTarget.videoId)) return
+    if (watchDone) return
     const next = Math.max(watchProgressFloorRef.current, update.percent)
     if (next <= watchProgressFloorRef.current && update.percent < 100) return
     watchProgressFloorRef.current = next
@@ -184,9 +123,9 @@ export function LearnerTraining() {
   }
 
   async function onReport(videoId: number, title: string) {
+    const assignment = assignments.find((a) => a.videoId === videoId)
     const raw =
-      percentByVideo[videoId] ??
-      String(progressByVideo.get(videoId)?.percent ?? 0)
+      percentByVideo[videoId] ?? String(assignment?.percent ?? 0)
     const percent = Number(raw)
     if (Number.isNaN(percent) || percent < 0 || percent > 100) {
       showToast({
@@ -199,7 +138,6 @@ export function LearnerTraining() {
       const result = await upsertProgress({
         videoId,
         percent,
-        // Manual edits may lower progress; estimate resume near that %.
         positionSeconds: 0,
         allowDecrease: true,
       }).unwrap()
@@ -224,7 +162,7 @@ export function LearnerTraining() {
 
   return (
     <>
-      {assignments.length > 0 ? (
+      {stats && stats.assigned > 0 ? (
         <div className="learner-stat-strip" aria-label="Training summary">
           <div className="learner-stat">
             <span className="learner-stat-value">{stats.assigned}</span>
@@ -251,8 +189,8 @@ export function LearnerTraining() {
             <div className="learner-continue-copy">
               <p className="learner-continue-eyebrow">Last played</p>
               <h2 className="learner-continue-title">
-                {continueAssignment.assignment.videoTitle ??
-                  `Video #${continueAssignment.assignment.videoId}`}
+                {continueAssignment.videoTitle ??
+                  `Video #${continueAssignment.videoId}`}
               </h2>
               <div className="learner-continue-meta">
                 {continueAssignment.percent > 0 ? (
@@ -270,11 +208,10 @@ export function LearnerTraining() {
               className="btn btn-primary learner-continue-btn"
               type="button"
               disabled={playbackState.isFetching}
-              onClick={() => void openWatch(continueAssignment.assignment)}
+              onClick={() => void openWatch(continueAssignment)}
             >
               {playbackState.isFetching &&
-              playbackState.originalArgs ===
-                continueAssignment.assignment.videoId
+              playbackState.originalArgs === continueAssignment.videoId
                 ? 'Loading…'
                 : 'Continue watching'}
             </button>
@@ -285,13 +222,13 @@ export function LearnerTraining() {
       <section className="panel learner-assignments">
         <header className="panel-head">
           <h2 className="panel-title">Assigned videos</h2>
-          {assignments.length > 0 ? (
+          {total > 0 && stats ? (
             <span className="panel-count">
-              {completedVideos.size}/{assignments.length} complete
+              {stats.completed}/{stats.assigned} complete
             </span>
           ) : null}
         </header>
-        {assignments.length === 0 ? (
+        {total === 0 ? (
           <div className="panel-body">
             <p className="cell-primary mb-2">No assignments yet</p>
             <p className="text-muted text-sm">
@@ -301,10 +238,10 @@ export function LearnerTraining() {
         ) : (
           <>
             <ul className="learner-assign-list">
-              {pagedAssignments.map((a) => {
+              {assignments.map((a) => {
                 const title = a.videoTitle ?? `Video #${a.videoId}`
-                const percent = progressByVideo.get(a.videoId)?.percent ?? 0
-                const done = completedVideos.has(a.videoId)
+                const percent = a.percent
+                const done = a.completed
                 const status = learnerStatus(done, percent)
                 const fetchingPlay =
                   playbackState.isFetching &&
@@ -430,8 +367,8 @@ export function LearnerTraining() {
             </ul>
             <PaginationControls
               page={page}
-              pageSize={PAGE_SIZE}
-              total={sortedAssignments.length}
+              pageSize={DEFAULT_PAGE_SIZE}
+              total={total}
               onPageChange={setPage}
             />
           </>

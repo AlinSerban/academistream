@@ -6,6 +6,7 @@ import {
     Get,
     Param,
     Post,
+    Query,
     Req,
 } from '@nestjs/common'
 import type { Request } from 'express'
@@ -14,6 +15,7 @@ import { Roles } from '../auth/roles.decorator'
 import type { JwtPayload } from '../auth/types'
 import { InvitesService } from './invites.service'
 import type { AcceptInviteInput, CreateInviteInput } from './types'
+import { parsePageQuery } from '../common/pagination'
 
 @Controller('invites')
 export class InvitesController {
@@ -21,9 +23,16 @@ export class InvitesController {
 
     @Roles('tenant_admin')
     @Get()
-    list(@Req() req: Request) {
+    list(
+        @Req() req: Request,
+        @Query('page') page?: string,
+        @Query('pageSize') pageSize?: string,
+    ) {
         const tenantId = this.getTenantId(req.user as JwtPayload)
-        return this.invitesService.listPending(tenantId)
+        return this.invitesService.listPending(
+            tenantId,
+            parsePageQuery(page, pageSize),
+        )
     }
 
     @Roles('tenant_admin')

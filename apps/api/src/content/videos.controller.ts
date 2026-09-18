@@ -11,14 +11,17 @@ import {
     Req,
     UploadedFile,
     UseInterceptors,
-} from "@nestjs/common"
-import { VideosService } from "./videos.service"
-import type { JwtPayload } from "../auth/types"
-import type { Request } from "express"
-import type { CreateVideoInput, PublishVideoInput, UpdateVideoInput } from "./types"
-import { Roles } from "../auth/roles.decorator"
-import { FileInterceptor } from "@nestjs/platform-express"
-import { resolveUploadMaxBytes } from "../upload/upload-limits"
+} from '@nestjs/common'
+import { VideosService } from './videos.service'
+import type { JwtPayload } from '../auth/types'
+import type { Request } from 'express'
+import type { CreateVideoInput, MediaStatus, PublishVideoInput, UpdateVideoInput } from './types'
+import { Roles } from '../auth/roles.decorator'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { resolveUploadMaxBytes } from '../upload/upload-limits'
+import { parsePageQuery } from '../common/pagination'
+
+const MEDIA_STATUSES: MediaStatus[] = ['queued', 'processing', 'ready', 'failed']
 
 @Roles('tenant_admin', 'instructor')
 @Controller('videos')
@@ -26,44 +29,72 @@ export class VideosController {
     constructor(private readonly videosService: VideosService) { }
 
     @Get()
-    readAll(@Req() req: Request) {
-        const tenantId = this.getTenantId(req.user as JwtPayload);
-        return this.videosService.listAll(tenantId);
+    readAll(
+        @Req() req: Request,
+        @Query('page') page?: string,
+        @Query('pageSize') pageSize?: string,
+        @Query('mediaStatus') mediaStatus?: string,
+    ) {
+        const tenantId = this.getTenantId(req.user as JwtPayload)
+        const status =
+            mediaStatus && MEDIA_STATUSES.includes(mediaStatus as MediaStatus)
+                ? (mediaStatus as MediaStatus)
+                : undefined
+        return this.videosService.list(
+            tenantId,
+            parsePageQuery(page, pageSize),
+            status,
+        )
+    }
+
+    @Get('assignable')
+    listAssignable(
+        @Req() req: Request,
+        @Query('page') page?: string,
+        @Query('pageSize') pageSize?: string,
+    ) {
+        const tenantId = this.getTenantId(req.user as JwtPayload)
+        return this.videosService.listAssignable(
+            tenantId,
+            parsePageQuery(page, pageSize, { pageSize: 50 }),
+        )
     }
 
     @Get('stuck')
-    getStuckVideos(@Query('olderThanMinutes') olderThanMinutes: string, @Req() req: Request) {
-        const tenantId = this.getTenantId(req.user as JwtPayload);
-        return this.videosService.getStuckVideos(tenantId, Number(olderThanMinutes));
+    getStuckVideos(
+        @Query('olderThanMinutes') olderThanMinutes: string,
+        @Req() req: Request,
+    ) {
+        const tenantId = this.getTenantId(req.user as JwtPayload)
+        return this.videosService.getStuckVideos(tenantId, Number(olderThanMinutes))
     }
 
     @Get('by-course/:courseId')
     readByCourse(@Param('courseId') courseId: string, @Req() req: Request) {
-        const tenantId = this.getTenantId(req.user as JwtPayload);
-        return this.videosService.listByCourse(Number(courseId), tenantId);
+        const tenantId = this.getTenantId(req.user as JwtPayload)
+        return this.videosService.listByCourse(Number(courseId), tenantId)
     }
 
     @Get(':id')
     read(@Param('id') videoId: string, @Req() req: Request) {
-        const tenantId = this.getTenantId(req.user as JwtPayload);
-        return this.videosService.getVideoById(Number(videoId), tenantId);
+        const tenantId = this.getTenantId(req.user as JwtPayload)
+        return this.videosService.getVideoById(Number(videoId), tenantId)
     }
-
 
     @Roles('tenant_admin', 'instructor', 'learner')
     @Get(':id/playback')
     getPlaybackUrl(@Param('id') videoId: string, @Req() req: Request) {
-        const user = req.user as JwtPayload;
-        const tenantId = this.getTenantId(user);
-        const role = user.roles[0]?.role;
-        if (role == null) throw new ForbiddenException();
-        return this.videosService.getPlaybackUrl(Number(videoId), tenantId, role);
+        const user = req.user as JwtPayload
+        const tenantId = this.getTenantId(user)
+        const role = user.roles[0]?.role
+        if (role == null) throw new ForbiddenException()
+        return this.videosService.getPlaybackUrl(Number(videoId), tenantId, role)
     }
 
     @Post('create')
     create(@Body() body: CreateVideoInput, @Req() req: Request) {
-        const tenantId = this.getTenantId(req.user as JwtPayload);
-        return this.videosService.create(tenantId, body);
+        const tenantId = this.getTenantId(req.user as JwtPayload)
+        return this.videosService.create(tenantId, body)
     }
 
     @Post(':id/upload')
@@ -72,20 +103,25 @@ export class VideosController {
             limits: { fileSize: resolveUploadMaxBytes() },
         }),
     )
-    upload(@Param('id') videoId: string, @UploadedFile() file: Express.Multer.File, @Req() req: Request) {
-        const tenantId = this.getTenantId(req.user as JwtPayload);
-        return this.videosService.uploadVideo(Number(videoId), tenantId, file);
+    upload(
+        @Param('id') videoId: string,
+        @UploadedFile() file: Express.Multer.File,
+        @Req() req: Request,
+    ) {
+        const tenantId = this.getTenantId(req.user as JwtPayload)
+        return this.videosService.uploadVideo(Number(videoId), tenantId, file)
     }
+
     @Post(':id/retry')
     retry(@Param('id') videoId: string, @Req() req: Request) {
-        const tenantId = this.getTenantId(req.user as JwtPayload);
-        return this.videosService.retryVideo(Number(videoId), tenantId);
+        const tenantId = this.getTenantId(req.user as JwtPayload)
+        return this.videosService.retryVideo(Number(videoId), tenantId)
     }
 
     @Post(':id/cancel-processing')
     cancel(@Param('id') videoId: string, @Req() req: Request) {
-        const tenantId = this.getTenantId(req.user as JwtPayload);
-        return this.videosService.cancelVideoProcessing(Number(videoId), tenantId);
+        const tenantId = this.getTenantId(req.user as JwtPayload)
+        return this.videosService.cancelVideoProcessing(Number(videoId), tenantId)
     }
 
     @Patch(':id/publish')
@@ -94,14 +130,14 @@ export class VideosController {
         @Body() body: PublishVideoInput,
         @Req() req: Request,
     ) {
-        const user = req.user as JwtPayload;
-        const tenantId = this.getTenantId(user);
+        const user = req.user as JwtPayload
+        const tenantId = this.getTenantId(user)
         return this.videosService.publish(
             Number(videoId),
             tenantId,
             body.publishState,
             user.sub,
-        );
+        )
     }
 
     @Patch(':id')
@@ -110,19 +146,19 @@ export class VideosController {
         @Body() body: UpdateVideoInput,
         @Req() req: Request,
     ) {
-        const tenantId = this.getTenantId(req.user as JwtPayload);
-        return this.videosService.update(Number(videoId), body, tenantId);
+        const tenantId = this.getTenantId(req.user as JwtPayload)
+        return this.videosService.update(Number(videoId), body, tenantId)
     }
 
     @Delete(':id')
     delete(@Param('id') videoId: string, @Req() req: Request) {
-        const tenantId = this.getTenantId(req.user as JwtPayload);
-        return this.videosService.deleteVideo(Number(videoId), tenantId);
+        const tenantId = this.getTenantId(req.user as JwtPayload)
+        return this.videosService.deleteVideo(Number(videoId), tenantId)
     }
 
     private getTenantId(user: JwtPayload) {
-        const tenantId = user.roles[0]?.tenantId;
-        if (tenantId == null) throw new ForbiddenException();
-        return tenantId;
+        const tenantId = user.roles[0]?.tenantId
+        if (tenantId == null) throw new ForbiddenException()
+        return tenantId
     }
 }

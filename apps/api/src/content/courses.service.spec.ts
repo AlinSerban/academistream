@@ -78,17 +78,49 @@ describe('CoursesService', () => {
     );
   });
 
-  it('listAll scopes to tenantId (Acme vs Globex)', async () => {
+  it('list scopes to tenantId (Acme vs Globex)', async () => {
     const acmeCourses = [{ id: 1, tenantId: 10, title: 'Acme 101' }];
-    const { where } = mockSelectWhere(acmeCourses);
+    const countWhere = jest.fn().mockResolvedValue([{ total: 1 }]);
+    const offset = jest.fn().mockResolvedValue(acmeCourses);
+    const limit = jest.fn().mockReturnValue({ offset });
+    const orderBy = jest.fn().mockReturnValue({ limit });
+    const listWhere = jest.fn().mockReturnValue({ orderBy });
+    const from = jest
+      .fn()
+      .mockReturnValueOnce({ where: countWhere })
+      .mockReturnValueOnce({ where: listWhere });
+    db.select.mockReturnValue({ from });
 
-    await expect(service.listAll(10)).resolves.toEqual(acmeCourses);
-    expect(where).toHaveBeenCalled();
+    await expect(
+      service.list(10, { page: 1, pageSize: 5 }),
+    ).resolves.toEqual({
+      items: acmeCourses,
+      total: 1,
+      page: 1,
+      pageSize: 5,
+    });
+    expect(listWhere).toHaveBeenCalled();
   });
 
-  it('listAll returns empty for tenant with no courses', async () => {
-    mockSelectWhere([]);
+  it('list returns empty for tenant with no courses', async () => {
+    const countWhere = jest.fn().mockResolvedValue([{ total: 0 }]);
+    const offset = jest.fn().mockResolvedValue([]);
+    const limit = jest.fn().mockReturnValue({ offset });
+    const orderBy = jest.fn().mockReturnValue({ limit });
+    const listWhere = jest.fn().mockReturnValue({ orderBy });
+    const from = jest
+      .fn()
+      .mockReturnValueOnce({ where: countWhere })
+      .mockReturnValueOnce({ where: listWhere });
+    db.select.mockReturnValue({ from });
 
-    await expect(service.listAll(20)).resolves.toEqual([]);
+    await expect(
+      service.list(20, { page: 1, pageSize: 5 }),
+    ).resolves.toEqual({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 5,
+    });
   });
 });

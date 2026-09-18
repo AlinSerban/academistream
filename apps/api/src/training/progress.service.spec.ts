@@ -289,13 +289,25 @@ describe('ProgressService', () => {
 
   it('listForTenant returns only tenant rows', async () => {
     const rows = [{ id: 1, tenantId: 10, percent: 40 }]
-    db.select.mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(rows),
-      }),
-    })
+    const countWhere = jest.fn().mockResolvedValue([{ total: 1 }])
+    const offset = jest.fn().mockResolvedValue(rows)
+    const limit = jest.fn().mockReturnValue({ offset })
+    const orderBy = jest.fn().mockReturnValue({ limit })
+    const listWhere = jest.fn().mockReturnValue({ orderBy })
+    const from = jest
+      .fn()
+      .mockReturnValueOnce({ where: countWhere })
+      .mockReturnValueOnce({ where: listWhere })
+    db.select.mockReturnValue({ from })
 
-    await expect(service.listForTenant(10)).resolves.toEqual(rows)
+    await expect(
+      service.listForTenant(10, { page: 1, pageSize: 5 }),
+    ).resolves.toEqual({
+      items: rows,
+      total: 1,
+      page: 1,
+      pageSize: 5,
+    })
   })
 
   it('learner without assignment is forbidden', async () => {

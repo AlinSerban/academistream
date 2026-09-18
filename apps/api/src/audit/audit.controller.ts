@@ -9,6 +9,7 @@ import type { Request } from 'express'
 import { Roles } from '../auth/roles.decorator'
 import type { JwtPayload } from '../auth/types'
 import { AuditService } from './audit.service'
+import { parsePageQuery } from '../common/pagination'
 
 @Controller('audit-events')
 export class AuditController {
@@ -16,12 +17,15 @@ export class AuditController {
 
     @Roles('tenant_admin', 'instructor')
     @Get()
-    list(@Req() req: Request, @Query('limit') limit?: string) {
+    list(
+        @Req() req: Request,
+        @Query('page') page?: string,
+        @Query('pageSize') pageSize?: string,
+    ) {
         const tenantId = this.getTenantId(req.user as JwtPayload)
-        const parsed = limit != null ? Number(limit) : 100
         return this.auditService.listForTenant(
             tenantId,
-            Number.isFinite(parsed) ? parsed : 100,
+            parsePageQuery(page, pageSize),
         )
     }
 

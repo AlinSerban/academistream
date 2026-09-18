@@ -45,16 +45,35 @@ describe('AssignmentsController', () => {
   }
 
   it('listAll uses Acme tenantId from JWT', async () => {
-    assignmentsService.listForTenant.mockResolvedValue([])
+    assignmentsService.listForTenant.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 5,
+    })
     await controller.listAll({ user: acmeAdmin } as unknown as Request)
-    expect(assignmentsService.listForTenant).toHaveBeenCalledWith(10)
+    expect(assignmentsService.listForTenant).toHaveBeenCalledWith(10, {
+      page: 1,
+      pageSize: 5,
+    })
   })
 
   it('listAll uses Globex tenantId so Acme cannot list Globex', async () => {
-    assignmentsService.listForTenant.mockResolvedValue([])
+    assignmentsService.listForTenant.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 5,
+    })
     await controller.listAll({ user: globexAdmin } as unknown as Request)
-    expect(assignmentsService.listForTenant).toHaveBeenCalledWith(20)
-    expect(assignmentsService.listForTenant).not.toHaveBeenCalledWith(10)
+    expect(assignmentsService.listForTenant).toHaveBeenCalledWith(20, {
+      page: 1,
+      pageSize: 5,
+    })
+    expect(assignmentsService.listForTenant).not.toHaveBeenCalledWith(
+      10,
+      expect.anything(),
+    )
   })
 
   it('listMine passes user.sub and tenantId', async () => {
@@ -64,9 +83,19 @@ describe('AssignmentsController', () => {
       isPlatformAdmin: false,
       roles: [{ tenantId: 10, role: 'learner' }],
     }
-    assignmentsService.listMine.mockResolvedValue([])
+    assignmentsService.listMine.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 5,
+      stats: { assigned: 0, inProgress: 0, completed: 0, notStarted: 0 },
+      continueAssignment: null,
+    })
     await controller.listMine({ user: learner } as unknown as Request)
-    expect(assignmentsService.listMine).toHaveBeenCalledWith(10, 4)
+    expect(assignmentsService.listMine).toHaveBeenCalledWith(10, 4, {
+      page: 1,
+      pageSize: 5,
+    })
   })
 
   it('create forbids users with no membership', () => {

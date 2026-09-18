@@ -40,13 +40,27 @@ describe('MembersService', () => {
         membershipId: 1,
       },
     ]
-    const where = jest.fn().mockResolvedValue(rows)
-    const innerJoin = jest.fn().mockReturnValue({ where })
-    const from = jest.fn().mockReturnValue({ innerJoin })
+    const countWhere = jest.fn().mockResolvedValue([{ total: 1 }])
+    const offset = jest.fn().mockResolvedValue(rows)
+    const limit = jest.fn().mockReturnValue({ offset })
+    const orderBy = jest.fn().mockReturnValue({ limit })
+    const listWhere = jest.fn().mockReturnValue({ orderBy })
+    const innerJoin = jest.fn().mockReturnValue({ where: listWhere })
+    const from = jest
+      .fn()
+      .mockReturnValueOnce({ where: countWhere })
+      .mockReturnValueOnce({ innerJoin })
     db.select.mockReturnValue({ from })
 
-    await expect(service.list(10)).resolves.toEqual(rows)
-    expect(where).toHaveBeenCalledTimes(1)
+    await expect(
+      service.list(10, { page: 1, pageSize: 5 }),
+    ).resolves.toEqual({
+      items: rows,
+      total: 1,
+      page: 1,
+      pageSize: 5,
+    })
+    expect(listWhere).toHaveBeenCalledTimes(1)
   })
 
   it('remove throws when membership missing for tenant', async () => {

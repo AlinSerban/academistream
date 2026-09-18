@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common'
 import type { Db } from '@academistream/db'
 import { invites, tenantMemberships, users } from '@academistream/db'
-import { and, eq } from 'drizzle-orm'
+import { and, count, desc, eq } from 'drizzle-orm'
 import { randomBytes } from 'crypto'
 import bcrypt from 'bcrypt'
 import { DRIZZLE } from '../db/db.module'
@@ -14,6 +14,11 @@ import { AuditService } from '../audit/audit.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { QuotasService } from '../quotas/quotas.service'
 import type { AcceptInviteInput, CreateInviteInput, InviteRole } from './types'
+import {
+    pageOffset,
+    toPageResult,
+    type PageParams,
+} from '../common/pagination'
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const ALLOWED_ROLES: InviteRole[] = ['tenant_admin', 'instructor', 'learner']
@@ -39,7 +44,7 @@ export class InvitesService {
         }
 
         const [pending] = await this.db
-            .select()
+            .select({ id: invites.id })
             .from(invites)
             .where(
                 and(
@@ -110,8 +115,18 @@ export class InvitesService {
         }
     }
 
-    async listPending(tenantId: number) {
-        return this.db
+    async listPending(tenantId: number, params: PageParams) {
+        const whereClause = and(
+            eq(invites.tenantId, tenantId),
+            eq(invites.status, 'pending'),
+        )
+
+        const [totalRow] = await this.db
+            .select({ total: count() })
+            .from(invites)
+            .where(whereClause)
+
+        const items = await this.db
             .select({
                 id: invites.id,
                 email: invites.email,
@@ -122,12 +137,12 @@ export class InvitesService {
                 invitedByUserId: invites.invitedByUserId,
             })
             .from(invites)
-            .where(
-                and(
-                    eq(invites.tenantId, tenantId),
-                    eq(invites.status, 'pending'),
-                ),
-            )
+            .where(whereClause)
+            .orderBy(desc(invites.createdAt))
+            .limit(params.pageSize)
+            .offset(pageOffset(params))
+
+        return toPageResult(items, Number(totalRow?.total ?? 0), params)
     }
 
     async revoke(inviteId: number, tenantId: number, actorUserId: number) {

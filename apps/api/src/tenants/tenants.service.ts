@@ -38,21 +38,35 @@ export class TenantsService {
     }
 
     private async getTenantById(tenantId: number) {
-        return await this.db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+        return await this.db
+            .select({
+                id: tenants.id,
+                name: tenants.name,
+                status: tenants.status,
+            })
+            .from(tenants)
+            .where(eq(tenants.id, tenantId))
+            .limit(1);
     }
 
     private async assertTenantNameAvailable(name: string) {
-        const checkDuplicateTenant = await this.db.select().from(tenants).where(eq(tenants.name, name));
+        const [dup] = await this.db
+            .select({ id: tenants.id })
+            .from(tenants)
+            .where(eq(tenants.name, name))
+            .limit(1);
 
-        if (checkDuplicateTenant.length > 0)
-            throw new ConflictException();
+        if (dup) throw new ConflictException();
     }
 
     private async assertEmailAvailable(email: string) {
-        const checkDuplicateUser = await this.db.select().from(users).where(eq(users.email, email));
+        const [dup] = await this.db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1);
 
-        if (checkDuplicateUser.length > 0)
-            throw new ConflictException();
+        if (dup) throw new ConflictException();
     }
 
     private async insertTenant(name: string) {

@@ -111,9 +111,26 @@ describe('AssignmentsService', () => {
 
   it('listForTenant scopes to caller tenant', async () => {
     const rows = [{ id: 1, tenantId: 10 }]
-    mockSelectWhere(rows)
+    const countWhere = jest.fn().mockResolvedValue([{ total: 1 }])
+    const offset = jest.fn().mockResolvedValue(rows)
+    const limit = jest.fn().mockReturnValue({ offset })
+    const orderBy = jest.fn().mockReturnValue({ limit })
+    const listWhere = jest.fn().mockReturnValue({ orderBy })
+    const innerJoin = jest.fn().mockReturnValue({ where: listWhere })
+    const from = jest
+      .fn()
+      .mockReturnValueOnce({ where: countWhere })
+      .mockReturnValueOnce({ innerJoin })
+    db.select.mockReturnValue({ from })
 
-    await expect(service.listForTenant(10)).resolves.toEqual(rows)
+    await expect(
+      service.listForTenant(10, { page: 1, pageSize: 5 }),
+    ).resolves.toEqual({
+      items: rows,
+      total: 1,
+      page: 1,
+      pageSize: 5,
+    })
   })
 
   it('delete throws when assignment missing for tenant', async () => {

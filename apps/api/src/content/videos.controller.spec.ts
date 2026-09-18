@@ -8,14 +8,14 @@ import type { JwtPayload } from '../auth/types';
 describe('VideosController', () => {
   let controller: VideosController;
   let videosService: {
-    listAll: jest.Mock;
+    list: jest.Mock;
     getVideoById: jest.Mock;
     getPlaybackUrl: jest.Mock;
   };
 
   beforeEach(async () => {
     videosService = {
-      listAll: jest.fn(),
+      list: jest.fn(),
       getVideoById: jest.fn(),
       getPlaybackUrl: jest.fn(),
     };
@@ -54,20 +54,32 @@ describe('VideosController', () => {
   };
 
   it('readAll uses Acme tenantId from JWT (not client-supplied)', async () => {
-    videosService.listAll.mockResolvedValue([{ id: 1 }]);
+    const page = { items: [{ id: 1 }], total: 1, page: 1, pageSize: 5, mediaBusy: false };
+    videosService.list.mockResolvedValue(page);
 
-    await expect(controller.readAll(reqAs(acmeAdmin))).resolves.toEqual([
-      { id: 1 },
-    ]);
-    expect(videosService.listAll).toHaveBeenCalledWith(10);
+    await expect(controller.readAll(reqAs(acmeAdmin))).resolves.toEqual(page);
+    expect(videosService.list).toHaveBeenCalledWith(
+      10,
+      { page: 1, pageSize: 5 },
+      undefined,
+    );
   });
 
   it('readAll uses Globex tenantId so tenant A cannot list tenant B', async () => {
-    videosService.listAll.mockResolvedValue([]);
+    const page = { items: [], total: 0, page: 1, pageSize: 5, mediaBusy: false };
+    videosService.list.mockResolvedValue(page);
 
-    await expect(controller.readAll(reqAs(globexAdmin))).resolves.toEqual([]);
-    expect(videosService.listAll).toHaveBeenCalledWith(20);
-    expect(videosService.listAll).not.toHaveBeenCalledWith(10);
+    await expect(controller.readAll(reqAs(globexAdmin))).resolves.toEqual(page);
+    expect(videosService.list).toHaveBeenCalledWith(
+      20,
+      { page: 1, pageSize: 5 },
+      undefined,
+    );
+    expect(videosService.list).not.toHaveBeenCalledWith(
+      10,
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it('getPlaybackUrl passes tenantId and role from JWT', async () => {

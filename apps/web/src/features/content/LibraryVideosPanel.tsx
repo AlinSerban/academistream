@@ -1,34 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { SerializedError } from '@reduxjs/toolkit'
-import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
-import {
-  PaginationControls,
-  slicePage,
-} from '../../components/PaginationControls'
+import { useEffect, useState } from 'react'
+import { PaginationControls } from '../../components/PaginationControls'
 import { VideoPlayerModal } from '../../components/VideoPlayerModal'
-import { useLazyGetPlaybackUrlQuery } from './contentApi'
+import { useGetVideosQuery, useLazyGetPlaybackUrlQuery } from './contentApi'
 import type { Video } from './types'
 import { getListErrorMessage } from './libraryErrors'
 import type { WatchTarget } from './libraryTypes'
 import { VideoTableRow } from './VideoTableRow'
-
-const VIDEO_PAGE_SIZE = 5
+import { DEFAULT_PAGE_SIZE } from '../../lib/pagination'
 
 type Props = {
-  videos: Video[]
-  videosLoading: boolean
-  videosError: boolean
-  videosErr: FetchBaseQueryError | SerializedError | undefined
-  courseTitleById: Map<number, string>
+  pollMs: number
+  onMediaBusyChange: (busy: boolean) => void
 }
 
-export function LibraryVideosPanel({
-  videos,
-  videosLoading,
-  videosError,
-  videosErr,
-  courseTitleById,
-}: Props) {
+export function LibraryVideosPanel({ pollMs, onMediaBusyChange }: Props) {
   const [videoStatusFilter, setVideoStatusFilter] = useState('all')
   const [videoPage, setVideoPage] = useState(1)
   const [fetchPlayback, playbackState] = useLazyGetPlaybackUrlQuery()
@@ -37,19 +22,30 @@ export function LibraryVideosPanel({
   >({})
   const [watchTarget, setWatchTarget] = useState<WatchTarget | null>(null)
 
-  const filteredVideos = useMemo(() => {
-    const list =
-      videoStatusFilter === 'all'
-        ? videos
-        : videos.filter((v) => v.mediaStatus === videoStatusFilter)
-    return [...list].sort((a, b) => b.id - a.id)
-  }, [videos, videoStatusFilter])
-
   useEffect(() => {
     setVideoPage(1)
-  }, [videoStatusFilter, videos.length])
+  }, [videoStatusFilter])
 
-  const pagedVideos = slicePage(filteredVideos, videoPage, VIDEO_PAGE_SIZE)
+  const {
+    data,
+    isLoading: videosLoading,
+    isError: videosError,
+    error: videosErr,
+  } = useGetVideosQuery(
+    {
+      page: videoPage,
+      pageSize: DEFAULT_PAGE_SIZE,
+      mediaStatus: videoStatusFilter,
+    },
+    { pollingInterval: pollMs },
+  )
+
+  const videos = data?.items ?? []
+  const total = data?.total ?? 0
+
+  useEffect(() => {
+    onMediaBusyChange(Boolean(data?.mediaBusy))
+  }, [data?.mediaBusy, onMediaBusyChange])
 
   async function onPlayback(video: Video, courseTitle: string) {
     setWatchTarget({
@@ -71,14 +67,14 @@ export function LibraryVideosPanel({
         <header className="panel-head">
           <h2 className="panel-title">Videos</h2>
           <div className="panel-head-tools">
-            {!videosLoading && !videosError && videos.length > 0 ? (
+            {!videosLoading && !videosError && total > 0 ? (
               <span className="panel-count">
                 {videoStatusFilter !== 'all'
-                  ? `${filteredVideos.length} of ${videos.length}`
-                  : `${videos.length} ${videos.length === 1 ? 'video' : 'videos'}`}
+                  ? `${total} match${total === 1 ? '' : 'es'}`
+                  : `${total} ${total === 1 ? 'video' : 'videos'}`}
               </span>
             ) : null}
-            {!videosLoading && !videosError && videos.length > 0 ? (
+            {!videosLoading && !videosError ? (
               <>
                 <label className="sr-only" htmlFor="video-status-filter">
                   Media status
@@ -106,7 +102,7 @@ export function LibraryVideosPanel({
           <p className="alert-error panel-empty" role="alert">
             {getListErrorMessage(videosErr)}
           </p>
-        ) : videos.length === 0 ? (
+        ) : total === 0 && videoStatusFilter === 'all' ? (
           <p className="panel-empty">No videos yet.</p>
         ) : (
           <>
@@ -125,17 +121,16 @@ export function LibraryVideosPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredVideos.length === 0 ? (
+                  {videos.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="cell-secondary">
                         No videos match that filter.
                       </td>
                     </tr>
                   ) : (
-                    pagedVideos.map((video) => {
+                    videos.map((video) => {
                       const courseTitle =
-                        courseTitleById.get(video.courseId) ??
-                        `Course ${video.courseId}`
+                        video.courseTitle ?? `Course ${video.courseId}`
                       return (
                         <VideoTableRow
                           key={video.id}
@@ -156,8 +151,8 @@ export function LibraryVideosPanel({
 
             <PaginationControls
               page={videoPage}
-              pageSize={VIDEO_PAGE_SIZE}
-              total={filteredVideos.length}
+              pageSize={DEFAULT_PAGE_SIZE}
+              total={total}
               onPageChange={setVideoPage}
             />
           </>

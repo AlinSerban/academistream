@@ -1,30 +1,40 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
 import { baseQueryWithReauth } from '../auth/baseQuery'
+import type { PageResult } from '../../lib/pagination'
 import type {
   Assignment,
   Completion,
   CreateAssignmentRequest,
   LearnerOption,
+  MyAssignmentsPage,
   UpsertProgressRequest,
   UpsertProgressResponse,
   WatchProgress,
 } from './types'
+
+export type PageArgs = {
+  page: number
+  pageSize: number
+}
 
 export const trainingApi = createApi({
   reducerPath: 'trainingApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Assignments', 'Progress', 'Completions', 'Learners'],
   endpoints: (builder) => ({
-    getAssignments: builder.query<Assignment[], void>({
-      query: () => '/assignments',
+    getAssignments: builder.query<PageResult<Assignment>, PageArgs>({
+      query: ({ page, pageSize }) =>
+        `/assignments?page=${page}&pageSize=${pageSize}`,
       providesTags: ['Assignments'],
     }),
-    getMyAssignments: builder.query<Assignment[], void>({
-      query: () => '/assignments/mine',
+    getMyAssignments: builder.query<MyAssignmentsPage, PageArgs>({
+      query: ({ page, pageSize }) =>
+        `/assignments/mine?page=${page}&pageSize=${pageSize}`,
       providesTags: ['Assignments'],
     }),
-    getLearners: builder.query<LearnerOption[], void>({
-      query: () => '/assignments/learners',
+    getLearners: builder.query<PageResult<LearnerOption>, PageArgs>({
+      query: ({ page, pageSize }) =>
+        `/assignments/learners?page=${page}&pageSize=${pageSize}`,
       providesTags: ['Learners'],
     }),
     createAssignment: builder.mutation<Assignment, CreateAssignmentRequest>({
@@ -51,22 +61,26 @@ export const trainingApi = createApi({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: ['Progress', 'Completions'],
+      invalidatesTags: ['Progress', 'Completions', 'Assignments'],
     }),
-    getMyProgress: builder.query<WatchProgress[], void>({
-      query: () => '/progress/mine',
+    getMyProgress: builder.query<PageResult<WatchProgress>, PageArgs>({
+      query: ({ page, pageSize }) =>
+        `/progress/mine?page=${page}&pageSize=${pageSize}`,
       providesTags: ['Progress'],
     }),
-    getProgress: builder.query<WatchProgress[], void>({
-      query: () => '/progress',
+    getProgress: builder.query<PageResult<WatchProgress>, PageArgs>({
+      query: ({ page, pageSize }) =>
+        `/progress?page=${page}&pageSize=${pageSize}`,
       providesTags: ['Progress'],
     }),
-    getMyCompletions: builder.query<Completion[], void>({
-      query: () => '/completions/mine',
+    getMyCompletions: builder.query<PageResult<Completion>, PageArgs>({
+      query: ({ page, pageSize }) =>
+        `/completions/mine?page=${page}&pageSize=${pageSize}`,
       providesTags: ['Completions'],
     }),
-    getCompletions: builder.query<Completion[], void>({
-      query: () => '/completions',
+    getCompletions: builder.query<PageResult<Completion>, PageArgs>({
+      query: ({ page, pageSize }) =>
+        `/completions?page=${page}&pageSize=${pageSize}`,
       providesTags: ['Completions'],
     }),
   }),
@@ -84,3 +98,4 @@ export const {
   useGetMyCompletionsQuery,
   useGetCompletionsQuery,
 } = trainingApi
+

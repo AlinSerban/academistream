@@ -1,12 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
-import {
-  PaginationControls,
-  slicePage,
-} from '../../components/PaginationControls'
+import { PaginationControls } from '../../components/PaginationControls'
 import { useToast } from '../../components/Toast'
 import { formatAuditAction, formatEntityType } from '../../lib/eventLabels'
+import { DEFAULT_PAGE_SIZE } from '../../lib/pagination'
 import { useMeQuery } from '../auth/authApi'
 import { useAppSelector } from '../../app/hooks'
 import {
@@ -19,8 +17,6 @@ import {
 } from './orgApi'
 import type { InviteRole } from './types'
 import { useGetQuotaUsageQuery } from '../quotas/quotasApi'
-
-const PAGE_SIZE = 5
 
 export function OrgPage() {
   const { data: me } = useMeQuery()
@@ -68,20 +64,20 @@ export function OrgPage() {
 }
 
 function InviteSection() {
-  const { data: invites = [], isError } = useGetInvitesQuery()
+  const [page, setPage] = useState(1)
+  const { data, isError } = useGetInvitesQuery({
+    page,
+    pageSize: DEFAULT_PAGE_SIZE,
+  })
   const [createInvite, createState] = useCreateInviteMutation()
   const [revokeInvite, revokeState] = useRevokeInviteMutation()
   const { showToast } = useToast()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<InviteRole>('learner')
   const [tokenOnce, setTokenOnce] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
 
-  useEffect(() => {
-    setPage(1)
-  }, [invites.length])
-
-  const paged = slicePage(invites, page, PAGE_SIZE)
+  const invites = data?.items ?? []
+  const total = data?.total ?? 0
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
@@ -90,6 +86,7 @@ function InviteSection() {
       const created = await createInvite({ email, role }).unwrap()
       setTokenOnce(created.token)
       setEmail('')
+      setPage(1)
       showToast({
         message: `Invite #${created.id} created. Copy the token below.`,
         tone: 'success',
@@ -103,60 +100,60 @@ function InviteSection() {
     <section className="panel">
       <header className="panel-head">
         <h2 className="panel-title">Invites</h2>
-        {invites.length > 0 ? (
+        {total > 0 ? (
           <span className="panel-count">
-            {invites.length} {invites.length === 1 ? 'invite' : 'invites'}
+            {total} {total === 1 ? 'invite' : 'invites'}
           </span>
         ) : null}
       </header>
 
       {isError ? (
         <p className="alert-error panel-empty">Could not load invites.</p>
-      ) : invites.length === 0 ? (
+      ) : total === 0 ? (
         <p className="panel-empty">No pending invites.</p>
       ) : (
         <>
           <div className="table-scroll">
             <table className="data-table data-table-zebra">
-            <thead>
-              <tr>
-                <th className="col-id">ID</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Expires</th>
-                <th className="col-actions">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {paged.map((inv) => (
-                <tr key={inv.id}>
-                  <td className="col-id cell-id">{inv.id}</td>
-                  <td className="cell-primary">{inv.email}</td>
-                  <td className="cell-secondary">{inv.role}</td>
-                  <td className="cell-secondary">
-                    {new Date(inv.expiresAt).toLocaleDateString()}
-                  </td>
-                  <td className="col-actions">
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      type="button"
-                      disabled={revokeState.isLoading}
-                      onClick={() => void revokeInvite(inv.id)}
-                    >
-                      Revoke
-                    </button>
-                  </td>
+              <thead>
+                <tr>
+                  <th className="col-id">ID</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Expires</th>
+                  <th className="col-actions">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {invites.map((inv) => (
+                  <tr key={inv.id}>
+                    <td className="col-id cell-id">{inv.id}</td>
+                    <td className="cell-primary">{inv.email}</td>
+                    <td className="cell-secondary">{inv.role}</td>
+                    <td className="cell-secondary">
+                      {new Date(inv.expiresAt).toLocaleDateString()}
+                    </td>
+                    <td className="col-actions">
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        type="button"
+                        disabled={revokeState.isLoading}
+                        onClick={() => void revokeInvite(inv.id)}
+                      >
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           <PaginationControls
             page={page}
-            pageSize={PAGE_SIZE}
-            total={invites.length}
+            pageSize={DEFAULT_PAGE_SIZE}
+            total={total}
             onPageChange={setPage}
           />
         </>
@@ -214,16 +211,16 @@ function InviteSection() {
 }
 
 function MembersSection() {
-  const { data: members = [], isError } = useGetMembersQuery()
+  const [page, setPage] = useState(1)
+  const { data, isError } = useGetMembersQuery({
+    page,
+    pageSize: DEFAULT_PAGE_SIZE,
+  })
   const [removeMember, removeState] = useRemoveMemberMutation()
   const { showToast } = useToast()
-  const [page, setPage] = useState(1)
 
-  useEffect(() => {
-    setPage(1)
-  }, [members.length])
-
-  const paged = slicePage(members, page, PAGE_SIZE)
+  const members = data?.items ?? []
+  const total = data?.total ?? 0
 
   async function onRemove(userId: number) {
     try {
@@ -241,55 +238,55 @@ function MembersSection() {
     <section className="panel">
       <header className="panel-head">
         <h2 className="panel-title">Members</h2>
-        {members.length > 0 ? (
+        {total > 0 ? (
           <span className="panel-count">
-            {members.length} {members.length === 1 ? 'member' : 'members'}
+            {total} {total === 1 ? 'member' : 'members'}
           </span>
         ) : null}
       </header>
       {isError ? (
         <p className="alert-error panel-empty">Could not load members.</p>
-      ) : members.length === 0 ? (
+      ) : total === 0 ? (
         <p className="panel-empty">No members.</p>
       ) : (
         <>
           <div className="table-scroll">
             <table className="data-table data-table-zebra">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th className="col-actions">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {paged.map((m) => (
-                <tr key={m.membershipId}>
-                  <td className="cell-primary">{m.name}</td>
-                  <td className="cell-secondary">{m.email}</td>
-                  <td className="cell-secondary">{m.role}</td>
-                  <td className="col-actions">
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      type="button"
-                      disabled={removeState.isLoading}
-                      onClick={() => void onRemove(m.userId)}
-                    >
-                      Remove
-                    </button>
-                  </td>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th className="col-actions">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {members.map((m) => (
+                  <tr key={m.membershipId}>
+                    <td className="cell-primary">{m.name}</td>
+                    <td className="cell-secondary">{m.email}</td>
+                    <td className="cell-secondary">{m.role}</td>
+                    <td className="col-actions">
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        type="button"
+                        disabled={removeState.isLoading}
+                        onClick={() => void onRemove(m.userId)}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           <PaginationControls
             page={page}
-            pageSize={PAGE_SIZE}
-            total={members.length}
+            pageSize={DEFAULT_PAGE_SIZE}
+            total={total}
             onPageChange={setPage}
           />
         </>
@@ -419,62 +416,66 @@ function QuotasSection() {
 }
 
 function AuditSection() {
-  const { data: events = [], isError } = useGetAuditEventsQuery(50)
   const [page, setPage] = useState(1)
+  const { data, isError } = useGetAuditEventsQuery({
+    page,
+    pageSize: DEFAULT_PAGE_SIZE,
+  })
 
-  useEffect(() => {
-    setPage(1)
-  }, [events.length])
-
-  const paged = slicePage(events, page, PAGE_SIZE)
+  const events = data?.items ?? []
+  const total = data?.total ?? 0
 
   return (
     <section className="panel">
       <header className="panel-head">
         <h2 className="panel-title">Audit events</h2>
-        {events.length > 0 ? (
+        {total > 0 ? (
           <span className="panel-count">
-            {events.length} {events.length === 1 ? 'event' : 'events'}
+            {total} {total === 1 ? 'event' : 'events'}
           </span>
         ) : null}
       </header>
       {isError ? (
         <p className="alert-error panel-empty">Could not load audit events.</p>
-      ) : events.length === 0 ? (
+      ) : total === 0 ? (
         <p className="panel-empty">No events yet.</p>
       ) : (
         <>
-          <p className="text-muted px-5 pt-3 text-sm">Newest first for this tenant.</p>
+          <p className="text-muted px-5 pt-3 text-sm">
+            Newest first for this tenant.
+          </p>
           <div className="table-scroll">
             <table className="data-table data-table-zebra">
-            <thead>
-              <tr>
-                <th>Action</th>
-                <th>Entity</th>
-                <th>When</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paged.map((ev) => (
-                <tr key={ev.id}>
-                  <td className="cell-primary">{formatAuditAction(ev.action)}</td>
-                  <td className="cell-secondary">
-                    {ev.entityType ? formatEntityType(ev.entityType) : '-'}
-                    {ev.entityId != null ? ` #${ev.entityId}` : ''}
-                  </td>
-                  <td className="cell-secondary">
-                    {new Date(ev.createdAt).toLocaleString()}
-                    {ev.actorUserId != null ? `, actor ${ev.actorUserId}` : ''}
-                  </td>
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Entity</th>
+                  <th>When</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {events.map((ev) => (
+                  <tr key={ev.id}>
+                    <td className="cell-primary">
+                      {formatAuditAction(ev.action)}
+                    </td>
+                    <td className="cell-secondary">
+                      {ev.entityType ? formatEntityType(ev.entityType) : '-'}
+                      {ev.entityId != null ? ` #${ev.entityId}` : ''}
+                    </td>
+                    <td className="cell-secondary">
+                      {new Date(ev.createdAt).toLocaleString()}
+                      {ev.actorUserId != null ? `, actor ${ev.actorUserId}` : ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           <PaginationControls
             page={page}
-            pageSize={PAGE_SIZE}
-            total={events.length}
+            pageSize={DEFAULT_PAGE_SIZE}
+            total={total}
             onPageChange={setPage}
           />
         </>

@@ -1,9 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import type { Db } from '@academistream/db'
 import { auditEvents } from '@academistream/db'
-import { desc, eq } from 'drizzle-orm'
+import { count, desc, eq } from 'drizzle-orm'
 import { DRIZZLE } from '../db/db.module'
 import type { AuditRecordInput } from './types'
+import {
+    pageOffset,
+    toPageResult,
+    type PageParams,
+} from '../common/pagination'
 
 @Injectable()
 export class AuditService {
@@ -31,12 +36,31 @@ export class AuditService {
         }
     }
 
-    async listForTenant(tenantId: number, limit = 100) {
-        return this.db
-            .select()
+    async listForTenant(tenantId: number, params: PageParams) {
+        const whereClause = eq(auditEvents.tenantId, tenantId)
+
+        const [totalRow] = await this.db
+            .select({ total: count() })
             .from(auditEvents)
-            .where(eq(auditEvents.tenantId, tenantId))
+            .where(whereClause)
+
+        const items = await this.db
+            .select({
+                id: auditEvents.id,
+                tenantId: auditEvents.tenantId,
+                actorUserId: auditEvents.actorUserId,
+                action: auditEvents.action,
+                entityType: auditEvents.entityType,
+                entityId: auditEvents.entityId,
+                metadata: auditEvents.metadata,
+                createdAt: auditEvents.createdAt,
+            })
+            .from(auditEvents)
+            .where(whereClause)
             .orderBy(desc(auditEvents.createdAt))
-            .limit(Math.min(Math.max(limit, 1), 500))
+            .limit(params.pageSize)
+            .offset(pageOffset(params))
+
+        return toPageResult(items, Number(totalRow?.total ?? 0), params)
     }
 }

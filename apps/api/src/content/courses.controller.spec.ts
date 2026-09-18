@@ -7,13 +7,13 @@ import type { JwtPayload } from '../auth/types';
 describe('CoursesController', () => {
   let controller: CoursesController;
   let coursesService: {
-    listAll: jest.Mock;
+    list: jest.Mock;
     getCourseById: jest.Mock;
   };
 
   beforeEach(async () => {
     coursesService = {
-      listAll: jest.fn(),
+      list: jest.fn(),
       getCourseById: jest.fn(),
     };
 
@@ -32,12 +32,22 @@ describe('CoursesController', () => {
       isPlatformAdmin: false,
       roles: [{ tenantId: 10, role: 'tenant_admin' }],
     };
-    coursesService.listAll.mockResolvedValue([{ id: 1, title: 'Acme 101' }]);
+    const page = {
+      items: [{ id: 1, title: 'Acme 101' }],
+      total: 1,
+      page: 1,
+      pageSize: 5,
+    };
+    coursesService.list.mockResolvedValue(page);
 
     await expect(
       controller.readAll({ user } as unknown as Request),
-    ).resolves.toEqual([{ id: 1, title: 'Acme 101' }]);
-    expect(coursesService.listAll).toHaveBeenCalledWith(10);
+    ).resolves.toEqual(page);
+    expect(coursesService.list).toHaveBeenCalledWith(
+      10,
+      { page: 1, pageSize: 5 },
+      undefined,
+    );
   });
 
   it('read uses Globex tenantId so Acme cannot fetch Globex course via controller', async () => {

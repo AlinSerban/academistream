@@ -1,10 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import {
-  PaginationControls,
-  slicePage,
-} from '../../components/PaginationControls'
+import { useState, type FormEvent } from 'react'
+import { PaginationControls } from '../../components/PaginationControls'
 import { useToast } from '../../components/Toast'
-import { useGetVideosQuery } from '../content/contentApi'
+import { useGetAssignableVideosQuery } from '../content/contentApi'
 import {
   useCreateAssignmentMutation,
   useGetAssignmentsQuery,
@@ -12,47 +9,44 @@ import {
   useGetLearnersQuery,
   useGetProgressQuery,
 } from './trainingApi'
-
-const PAGE_SIZE = 5
+import { DEFAULT_PAGE_SIZE } from '../../lib/pagination'
 
 export function StaffTraining() {
-  const { data: videos = [] } = useGetVideosQuery()
-  const { data: learners = [] } = useGetLearnersQuery()
-  const { data: assignments = [], isError: assignError } =
-    useGetAssignmentsQuery()
-  const { data: progress = [] } = useGetProgressQuery()
-  const { data: completions = [] } = useGetCompletionsQuery()
-  const [createAssignment, createState] = useCreateAssignmentMutation()
-  const { showToast } = useToast()
-
-  const [videoId, setVideoId] = useState('')
-  const [userId, setUserId] = useState('')
-
   const [assignPage, setAssignPage] = useState(1)
   const [progressPage, setProgressPage] = useState(1)
   const [completionsPage, setCompletionsPage] = useState(1)
+  const [learnerPage] = useState(1)
 
-  useEffect(() => {
-    setAssignPage(1)
-  }, [assignments.length])
-  useEffect(() => {
-    setProgressPage(1)
-  }, [progress.length])
-  useEffect(() => {
-    setCompletionsPage(1)
-  }, [completions.length])
-
-  const publishedReady = useMemo(
-    () =>
-      videos.filter(
-        (v) => v.publishState === 'published' && v.mediaStatus === 'ready',
-      ),
-    [videos],
+  const { data: assignable } = useGetAssignableVideosQuery({
+    page: 1,
+    pageSize: 50,
+  })
+  const { data: learnersPage } = useGetLearnersQuery({
+    page: learnerPage,
+    pageSize: 50,
+  })
+  const { data: assignmentsPage, isError: assignError } = useGetAssignmentsQuery(
+    { page: assignPage, pageSize: DEFAULT_PAGE_SIZE },
   )
+  const { data: progressPageData } = useGetProgressQuery({
+    page: progressPage,
+    pageSize: DEFAULT_PAGE_SIZE,
+  })
+  const { data: completionsPageData } = useGetCompletionsQuery({
+    page: completionsPage,
+    pageSize: DEFAULT_PAGE_SIZE,
+  })
 
-  const pagedAssignments = slicePage(assignments, assignPage, PAGE_SIZE)
-  const pagedProgress = slicePage(progress, progressPage, PAGE_SIZE)
-  const pagedCompletions = slicePage(completions, completionsPage, PAGE_SIZE)
+  const publishedReady = assignable?.items ?? []
+  const learners = learnersPage?.items ?? []
+  const assignments = assignmentsPage?.items ?? []
+  const progress = progressPageData?.items ?? []
+  const completions = completionsPageData?.items ?? []
+
+  const [createAssignment, createState] = useCreateAssignmentMutation()
+  const { showToast } = useToast()
+  const [videoId, setVideoId] = useState('')
+  const [userId, setUserId] = useState('')
 
   async function onAssign(event: FormEvent) {
     event.preventDefault()
@@ -129,14 +123,14 @@ export function StaffTraining() {
       <section className="panel">
         <header className="panel-head">
           <h2 className="panel-title">Assignments</h2>
-          {assignments.length > 0 ? (
+          {(assignmentsPage?.total ?? 0) > 0 ? (
             <span className="panel-count">
-              {assignments.length}{' '}
-              {assignments.length === 1 ? 'assignment' : 'assignments'}
+              {assignmentsPage?.total}{' '}
+              {assignmentsPage?.total === 1 ? 'assignment' : 'assignments'}
             </span>
           ) : null}
         </header>
-        {assignments.length === 0 ? (
+        {(assignmentsPage?.total ?? 0) === 0 ? (
           <p className="panel-empty">None yet.</p>
         ) : (
           <>
@@ -150,7 +144,7 @@ export function StaffTraining() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedAssignments.map((a) => (
+                  {assignments.map((a) => (
                     <tr key={a.id}>
                       <td className="col-id cell-id">{a.id}</td>
                       <td className="cell-secondary">User {a.userId}</td>
@@ -164,8 +158,8 @@ export function StaffTraining() {
             </div>
             <PaginationControls
               page={assignPage}
-              pageSize={PAGE_SIZE}
-              total={assignments.length}
+              pageSize={DEFAULT_PAGE_SIZE}
+              total={assignmentsPage?.total ?? 0}
               onPageChange={setAssignPage}
             />
           </>
@@ -175,13 +169,14 @@ export function StaffTraining() {
       <section className="panel">
         <header className="panel-head">
           <h2 className="panel-title">Tenant progress</h2>
-          {progress.length > 0 ? (
+          {(progressPageData?.total ?? 0) > 0 ? (
             <span className="panel-count">
-              {progress.length} {progress.length === 1 ? 'row' : 'rows'}
+              {progressPageData?.total}{' '}
+              {progressPageData?.total === 1 ? 'row' : 'rows'}
             </span>
           ) : null}
         </header>
-        {progress.length === 0 ? (
+        {(progressPageData?.total ?? 0) === 0 ? (
           <p className="panel-empty">No progress rows.</p>
         ) : (
           <>
@@ -196,7 +191,7 @@ export function StaffTraining() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedProgress.map((p) => (
+                  {progress.map((p) => (
                     <tr key={p.id}>
                       <td className="col-id cell-id">{p.id}</td>
                       <td className="cell-secondary">User {p.userId}</td>
@@ -209,8 +204,8 @@ export function StaffTraining() {
             </div>
             <PaginationControls
               page={progressPage}
-              pageSize={PAGE_SIZE}
-              total={progress.length}
+              pageSize={DEFAULT_PAGE_SIZE}
+              total={progressPageData?.total ?? 0}
               onPageChange={setProgressPage}
             />
           </>
@@ -220,14 +215,14 @@ export function StaffTraining() {
       <section className="panel">
         <header className="panel-head">
           <h2 className="panel-title">Completions</h2>
-          {completions.length > 0 ? (
+          {(completionsPageData?.total ?? 0) > 0 ? (
             <span className="panel-count">
-              {completions.length}{' '}
-              {completions.length === 1 ? 'completion' : 'completions'}
+              {completionsPageData?.total}{' '}
+              {completionsPageData?.total === 1 ? 'completion' : 'completions'}
             </span>
           ) : null}
         </header>
-        {completions.length === 0 ? (
+        {(completionsPageData?.total ?? 0) === 0 ? (
           <p className="panel-empty">No completions yet.</p>
         ) : (
           <>
@@ -242,7 +237,7 @@ export function StaffTraining() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedCompletions.map((c) => (
+                  {completions.map((c) => (
                     <tr key={c.id}>
                       <td className="col-id cell-id">{c.id}</td>
                       <td className="cell-secondary">User {c.userId}</td>
@@ -257,8 +252,8 @@ export function StaffTraining() {
             </div>
             <PaginationControls
               page={completionsPage}
-              pageSize={PAGE_SIZE}
-              total={completions.length}
+              pageSize={DEFAULT_PAGE_SIZE}
+              total={completionsPageData?.total ?? 0}
               onPageChange={setCompletionsPage}
             />
           </>

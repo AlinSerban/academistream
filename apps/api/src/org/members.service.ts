@@ -6,9 +6,23 @@ import {
 } from '@nestjs/common'
 import type { Db } from '@academistream/db'
 import { tenantMemberships, users } from '@academistream/db'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, count, eq, sql } from 'drizzle-orm'
 import { DRIZZLE } from '../db/db.module'
 import { AuditService } from '../audit/audit.service'
+import {
+    pageOffset,
+    toPageResult,
+    type PageParams,
+    type PageResult,
+} from '../common/pagination'
+
+export type MemberListItem = {
+    userId: number
+    email: string
+    name: string
+    role: string
+    membershipId: number
+}
 
 @Injectable()
 export class MembersService {
@@ -17,8 +31,18 @@ export class MembersService {
         private readonly audit: AuditService,
     ) { }
 
-    async list(tenantId: number) {
-        return this.db
+    async list(
+        tenantId: number,
+        params: PageParams,
+    ): Promise<PageResult<MemberListItem>> {
+        const whereClause = eq(tenantMemberships.tenantId, tenantId)
+
+        const [totalRow] = await this.db
+            .select({ total: count() })
+            .from(tenantMemberships)
+            .where(whereClause)
+
+        const items = await this.db
             .select({
                 userId: users.id,
                 email: users.email,
@@ -28,7 +52,12 @@ export class MembersService {
             })
             .from(tenantMemberships)
             .innerJoin(users, eq(users.id, tenantMemberships.userId))
-            .where(eq(tenantMemberships.tenantId, tenantId))
+            .where(whereClause)
+            .orderBy(sql`lower(${users.name})`)
+            .limit(params.pageSize)
+            .offset(pageOffset(params))
+
+        return toPageResult(items, Number(totalRow?.total ?? 0), params)
     }
 
     async remove(
@@ -37,7 +66,10 @@ export class MembersService {
         actorUserId: number,
     ) {
         const [membership] = await this.db
-            .select()
+            .select({
+                id: tenantMemberships.id,
+                role: tenantMemberships.role,
+            })
             .from(tenantMemberships)
             .where(
                 and(
@@ -50,8 +82,8 @@ export class MembersService {
         if (!membership) throw new NotFoundException()
 
         if (membership.role === 'tenant_admin') {
-            const [{ count }] = await this.db
-                .select({ count: sql<number>`count(*)::int` })
+            const [{ count: adminCount }] = await this.db
+                .select({ count: count() })
                 .from(tenantMemberships)
                 .where(
                     and(
@@ -60,7 +92,7 @@ export class MembersService {
                     ),
                 )
 
-            if (Number(count) <= 1) {
+            if (Number(adminCount) <= 1) {
                 throw new BadRequestException(
                     'Cannot remove the last tenant_admin',
                 )
@@ -80,7 +112,6 @@ export class MembersService {
             action: 'membership.removed',
             entityType: 'user',
             entityId: targetUserId,
-            metadata: { role: membership.role },
         })
 
         return deleted

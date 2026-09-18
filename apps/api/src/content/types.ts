@@ -1,5 +1,5 @@
-export type PublishState = 'draft' | 'published';
-export type MediaStatus = 'queued' | 'processing' | 'ready' | 'failed';
+export type PublishState = 'draft' | 'published'
+export type MediaStatus = 'queued' | 'processing' | 'ready' | 'failed'
 
 export interface CreateCourseInput {
     title: string
@@ -17,3 +17,9 @@ export interface UpdateVideoInput {
 export interface PublishVideoInput {
     publishState: PublishState
 }
+
+export type CourseOption = {
+    id: number
+    title: string
+}
+

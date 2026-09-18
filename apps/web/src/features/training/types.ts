@@ -8,6 +8,26 @@ export interface Assignment {
   videoTitle?: string
 }
 
+export interface MyAssignment extends Assignment {
+  percent: number
+  positionSeconds: number
+  completed: boolean
+}
+
+export interface MyAssignmentsPage {
+  items: MyAssignment[]
+  total: number
+  page: number
+  pageSize: number
+  stats: {
+    assigned: number
+    inProgress: number
+    completed: number
+    notStarted: number
+  }
+  continueAssignment: MyAssignment | null
+}
+
 export interface LearnerOption {
   userId: number
   email: string

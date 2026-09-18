@@ -88,6 +88,8 @@ Roles used in the product UI: `tenant_admin`, `instructor`, `learner` (plus plat
 
 UI status labels are the same in both modes (`queued` → `processing` → `ready`). On the hosted demo, “processing” is **not** MediaConvert.
 
+**List APIs:** tenant collections use `page` + `pageSize` (default 5, max 100) and return `{ items, total, page, pageSize }`. Filters run in SQL (`mediaStatus`, course `q`). Dropdowns use dedicated endpoints (`GET /courses/options`, `GET /videos/assignable`) instead of loading full tables. Learner `GET /assignments/mine` joins progress/completion and returns stats + continue-watching in one response.
+
 ### Training
 
 - Staff assign a **published + ready** video to a **learner** in the same tenant.

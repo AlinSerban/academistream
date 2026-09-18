@@ -55,28 +55,44 @@ describe('AuditService', () => {
     ).resolves.toBeUndefined()
   })
 
-  it('listForTenant scopes by tenantId and orders newest first', async () => {
+  it('listForTenant scopes by tenantId and pages results', async () => {
     const rows = [{ id: 2, tenantId: 10 }, { id: 1, tenantId: 10 }]
-    const limit = jest.fn().mockResolvedValue(rows)
+    const countWhere = jest.fn().mockResolvedValue([{ total: 2 }])
+    const countFrom = jest.fn().mockReturnValue({ where: countWhere })
+    const offset = jest.fn().mockResolvedValue(rows)
+    const limit = jest.fn().mockReturnValue({ offset })
     const orderBy = jest.fn().mockReturnValue({ limit })
     const where = jest.fn().mockReturnValue({ orderBy })
     const from = jest.fn().mockReturnValue({ where })
-    db.select.mockReturnValue({ from })
+    db.select
+      .mockReturnValueOnce({ from: countFrom })
+      .mockReturnValueOnce({ from })
 
-    await expect(service.listForTenant(10, 50)).resolves.toEqual(rows)
+    await expect(
+      service.listForTenant(10, { page: 1, pageSize: 5 }),
+    ).resolves.toEqual({
+      items: rows,
+      total: 2,
+      page: 1,
+      pageSize: 5,
+    })
     expect(where).toHaveBeenCalled()
-    expect(limit).toHaveBeenCalledWith(50)
+    expect(limit).toHaveBeenCalledWith(5)
   })
 
   it('listForTenant Acme query does not use Globex tenantId', async () => {
-    const limit = jest.fn().mockResolvedValue([])
+    const countWhere = jest.fn().mockResolvedValue([{ total: 0 }])
+    const countFrom = jest.fn().mockReturnValue({ where: countWhere })
+    const offset = jest.fn().mockResolvedValue([])
+    const limit = jest.fn().mockReturnValue({ offset })
     const orderBy = jest.fn().mockReturnValue({ limit })
     const where = jest.fn().mockReturnValue({ orderBy })
     const from = jest.fn().mockReturnValue({ where })
-    db.select.mockReturnValue({ from })
+    db.select
+      .mockReturnValueOnce({ from: countFrom })
+      .mockReturnValueOnce({ from })
 
-    await service.listForTenant(10)
-    // drizzle eq() is opaque; we assert the select path ran for tenant 10 only
+    await service.listForTenant(10, { page: 1, pageSize: 5 })
     expect(from).toHaveBeenCalled()
     expect(where).toHaveBeenCalledTimes(1)
   })

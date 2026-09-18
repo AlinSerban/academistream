@@ -86,10 +86,30 @@ describe('VideosService', () => {
   });
 
   it('listAll returns only the caller tenant rows', async () => {
-    const rows = [{ id: 3, tenantId: 10, title: 'Welcome' }];
-    mockSelectWhere(rows);
+    const rows = [{ id: 3, tenantId: 10, title: 'Welcome', courseTitle: 'C' }];
+    const countWhere = jest.fn().mockResolvedValue([{ total: 1 }]);
+    const busyWhere = jest.fn().mockResolvedValue([{ total: 0 }]);
+    const offset = jest.fn().mockResolvedValue(rows);
+    const limit = jest.fn().mockReturnValue({ offset });
+    const orderBy = jest.fn().mockReturnValue({ limit });
+    const listWhere = jest.fn().mockReturnValue({ orderBy });
+    const leftJoin = jest.fn().mockReturnValue({ where: listWhere });
+    const from = jest
+      .fn()
+      .mockReturnValueOnce({ where: countWhere })
+      .mockReturnValueOnce({ leftJoin })
+      .mockReturnValueOnce({ where: busyWhere });
+    db.select.mockReturnValue({ from });
 
-    await expect(service.listAll(10)).resolves.toEqual(rows);
+    await expect(
+      service.list(10, { page: 1, pageSize: 5 }),
+    ).resolves.toEqual({
+      items: rows,
+      total: 1,
+      page: 1,
+      pageSize: 5,
+      mediaBusy: false,
+    });
   });
 
   it('create succeeds when course is in tenant', async () => {

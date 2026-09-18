@@ -2,16 +2,16 @@ import { useState, type FormEvent } from 'react'
 import { useToast } from '../../components/Toast'
 import {
   useCreateVideoMutation,
+  useGetCourseOptionsQuery,
   useUploadVideoMutation,
 } from './contentApi'
-import type { Course } from './types'
 
 type Props = {
-  courses: Course[]
   onUploaded: () => void
 }
 
-export function LibraryUploadPanel({ courses, onUploaded }: Props) {
+export function LibraryUploadPanel({ onUploaded }: Props) {
+  const { data: courses = [] } = useGetCourseOptionsQuery()
   const [videoTitle, setVideoTitle] = useState('')
   const [courseId, setCourseId] = useState('')
   const [file, setFile] = useState<File | null>(null)

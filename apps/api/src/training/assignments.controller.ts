@@ -6,6 +6,7 @@ import {
     Get,
     Param,
     Post,
+    Query,
     Req,
 } from '@nestjs/common'
 import type { Request } from 'express'
@@ -13,6 +14,7 @@ import { Roles } from '../auth/roles.decorator'
 import type { JwtPayload } from '../auth/types'
 import { AssignmentsService } from './assignments.service'
 import type { CreateAssignmentInput } from './types'
+import { parsePageQuery } from '../common/pagination'
 
 @Controller('assignments')
 export class AssignmentsController {
@@ -20,24 +22,46 @@ export class AssignmentsController {
 
     @Roles('tenant_admin', 'instructor')
     @Get()
-    listAll(@Req() req: Request) {
+    listAll(
+        @Req() req: Request,
+        @Query('page') page?: string,
+        @Query('pageSize') pageSize?: string,
+    ) {
         const tenantId = this.getTenantId(req.user as JwtPayload)
-        return this.assignmentsService.listForTenant(tenantId)
+        return this.assignmentsService.listForTenant(
+            tenantId,
+            parsePageQuery(page, pageSize),
+        )
     }
 
     @Roles('tenant_admin', 'instructor')
     @Get('learners')
-    listLearners(@Req() req: Request) {
+    listLearners(
+        @Req() req: Request,
+        @Query('page') page?: string,
+        @Query('pageSize') pageSize?: string,
+    ) {
         const tenantId = this.getTenantId(req.user as JwtPayload)
-        return this.assignmentsService.listLearners(tenantId)
+        return this.assignmentsService.listLearners(
+            tenantId,
+            parsePageQuery(page, pageSize, { pageSize: 50 }),
+        )
     }
 
     @Roles('tenant_admin', 'instructor', 'learner')
     @Get('mine')
-    listMine(@Req() req: Request) {
+    listMine(
+        @Req() req: Request,
+        @Query('page') page?: string,
+        @Query('pageSize') pageSize?: string,
+    ) {
         const user = req.user as JwtPayload
         const tenantId = this.getTenantId(user)
-        return this.assignmentsService.listMine(tenantId, user.sub)
+        return this.assignmentsService.listMine(
+            tenantId,
+            user.sub,
+            parsePageQuery(page, pageSize),
+        )
     }
 
     @Roles('tenant_admin', 'instructor')

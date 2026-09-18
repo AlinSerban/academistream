@@ -1,5 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
 import { baseQueryWithReauth } from '../auth/baseQuery'
+import type { PageResult } from '../../lib/pagination'
 import type {
   AcceptInviteRequest,
   AcceptInviteResponse,
@@ -10,13 +11,19 @@ import type {
   Member,
 } from './types'
 
+export type PageArgs = {
+  page: number
+  pageSize: number
+}
+
 export const orgApi = createApi({
   reducerPath: 'orgApi',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Invites', 'Members', 'AuditEvents'],
   endpoints: (builder) => ({
-    getInvites: builder.query<Invite[], void>({
-      query: () => '/invites',
+    getInvites: builder.query<PageResult<Invite>, PageArgs>({
+      query: ({ page, pageSize }) =>
+        `/invites?page=${page}&pageSize=${pageSize}`,
       providesTags: ['Invites'],
     }),
     createInvite: builder.mutation<CreateInviteResponse, CreateInviteRequest>({
@@ -41,8 +48,9 @@ export const orgApi = createApi({
         body,
       }),
     }),
-    getMembers: builder.query<Member[], void>({
-      query: () => '/members',
+    getMembers: builder.query<PageResult<Member>, PageArgs>({
+      query: ({ page, pageSize }) =>
+        `/members?page=${page}&pageSize=${pageSize}`,
       providesTags: ['Members'],
     }),
     removeMember: builder.mutation<unknown, number>({
@@ -52,8 +60,9 @@ export const orgApi = createApi({
       }),
       invalidatesTags: ['Members', 'AuditEvents'],
     }),
-    getAuditEvents: builder.query<AuditEvent[], number | void>({
-      query: (limit = 100) => `/audit-events?limit=${limit ?? 100}`,
+    getAuditEvents: builder.query<PageResult<AuditEvent>, PageArgs>({
+      query: ({ page, pageSize }) =>
+        `/audit-events?page=${page}&pageSize=${pageSize}`,
       providesTags: ['AuditEvents'],
     }),
   }),

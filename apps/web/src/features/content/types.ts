@@ -9,6 +9,11 @@ export interface Course {
   updatedAt: string
 }
 
+export interface CourseOption {
+  id: number
+  title: string
+}
+
 export interface Video {
   id: number
   tenantId: number
@@ -20,6 +25,15 @@ export interface Video {
   mediaStatus: MediaStatus
   createdAt: string
   updatedAt: string
+  courseTitle?: string | null
+}
+
+export interface VideoListResult {
+  items: Video[]
+  total: number
+  page: number
+  pageSize: number
+  mediaBusy: boolean
 }
 
 export interface CreateCourseRequest {

@@ -12,7 +12,7 @@ import {
     videos,
     watchProgress,
 } from '@academistream/db'
-import { and, eq } from 'drizzle-orm'
+import { and, count, desc, eq } from 'drizzle-orm'
 import { DRIZZLE } from '../db/db.module'
 import { AssignmentsService } from './assignments.service'
 import {
@@ -21,6 +21,11 @@ import {
 } from './types'
 import { AuditService } from '../audit/audit.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import {
+    pageOffset,
+    toPageResult,
+    type PageParams,
+} from '../common/pagination'
 
 @Injectable()
 export class ProgressService {
@@ -56,7 +61,11 @@ export class ProgressService {
         }
 
         const [existing] = await this.db
-            .select()
+            .select({
+                id: watchProgress.id,
+                percent: watchProgress.percent,
+                positionSeconds: watchProgress.positionSeconds,
+            })
             .from(watchProgress)
             .where(
                 and(
@@ -113,42 +122,90 @@ export class ProgressService {
         return { progress, completion, threshold: COMPLETION_PERCENT_THRESHOLD }
     }
 
-    async listMine(tenantId: number, userId: number) {
-        return this.db
+    async listMine(tenantId: number, userId: number, params: PageParams) {
+        const whereClause = and(
+            eq(watchProgress.tenantId, tenantId),
+            eq(watchProgress.userId, userId),
+        )
+
+        const [totalRow] = await this.db
+            .select({ total: count() })
+            .from(watchProgress)
+            .where(whereClause)
+
+        const items = await this.db
             .select()
             .from(watchProgress)
-            .where(
-                and(
-                    eq(watchProgress.tenantId, tenantId),
-                    eq(watchProgress.userId, userId),
-                ),
-            )
+            .where(whereClause)
+            .orderBy(desc(watchProgress.updatedAt))
+            .limit(params.pageSize)
+            .offset(pageOffset(params))
+
+        return toPageResult(items, Number(totalRow?.total ?? 0), params)
     }
 
-    async listForTenant(tenantId: number) {
-        return this.db
+    async listForTenant(tenantId: number, params: PageParams) {
+        const whereClause = eq(watchProgress.tenantId, tenantId)
+
+        const [totalRow] = await this.db
+            .select({ total: count() })
+            .from(watchProgress)
+            .where(whereClause)
+
+        const items = await this.db
             .select()
             .from(watchProgress)
-            .where(eq(watchProgress.tenantId, tenantId))
+            .where(whereClause)
+            .orderBy(desc(watchProgress.updatedAt))
+            .limit(params.pageSize)
+            .offset(pageOffset(params))
+
+        return toPageResult(items, Number(totalRow?.total ?? 0), params)
     }
 
-    async listCompletionsMine(tenantId: number, userId: number) {
-        return this.db
+    async listCompletionsMine(
+        tenantId: number,
+        userId: number,
+        params: PageParams,
+    ) {
+        const whereClause = and(
+            eq(completions.tenantId, tenantId),
+            eq(completions.userId, userId),
+        )
+
+        const [totalRow] = await this.db
+            .select({ total: count() })
+            .from(completions)
+            .where(whereClause)
+
+        const items = await this.db
             .select()
             .from(completions)
-            .where(
-                and(
-                    eq(completions.tenantId, tenantId),
-                    eq(completions.userId, userId),
-                ),
-            )
+            .where(whereClause)
+            .orderBy(desc(completions.completedAt))
+            .limit(params.pageSize)
+            .offset(pageOffset(params))
+
+        return toPageResult(items, Number(totalRow?.total ?? 0), params)
     }
 
-    async listCompletionsForTenant(tenantId: number) {
-        return this.db
+    async listCompletionsForTenant(tenantId: number, params: PageParams) {
+        const whereClause = eq(completions.tenantId, tenantId)
+
+        const [totalRow] = await this.db
+            .select({ total: count() })
+            .from(completions)
+            .where(whereClause)
+
+        const items = await this.db
             .select()
             .from(completions)
-            .where(eq(completions.tenantId, tenantId))
+            .where(whereClause)
+            .orderBy(desc(completions.completedAt))
+            .limit(params.pageSize)
+            .offset(pageOffset(params))
+
+        return toPageResult(items, Number(totalRow?.total ?? 0), params)
     }
 
     private async ensureCompletion(
@@ -157,7 +214,13 @@ export class ProgressService {
         videoId: number,
     ) {
         const [existing] = await this.db
-            .select()
+            .select({
+                id: completions.id,
+                tenantId: completions.tenantId,
+                userId: completions.userId,
+                videoId: completions.videoId,
+                completedAt: completions.completedAt,
+            })
             .from(completions)
             .where(
                 and(
@@ -236,7 +299,11 @@ export class ProgressService {
         role: string,
     ) {
         const [video] = await this.db
-            .select()
+            .select({
+                id: videos.id,
+                mediaStatus: videos.mediaStatus,
+                publishState: videos.publishState,
+            })
             .from(videos)
             .where(and(eq(videos.id, videoId), eq(videos.tenantId, tenantId)))
             .limit(1)
