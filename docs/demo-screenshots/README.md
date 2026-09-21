@@ -1,59 +1,59 @@
 # Product tour
 
-Marked screenshots of the hosted demo flows (no docs/closer slide).
+What the app looks like for staff and learners.
 
 ## Instructor flow
 
-Staff create courses, upload video, publish, and assign training to a learner.
+Create a course, upload a video, publish it, and assign it to a learner.
 
 ### Library
 
-Tenant context and the content library home (courses + create/upload).
+Content library with tenant context.
 
 ![Instructor library](instructor/library.png)
 
 ### Media ready
 
-After upload/processing, the video shows **ready** in the library table.
+Uploaded video finishes processing and shows as ready.
 
 ![Media ready](instructor/media-ready.png)
 
 ### Published
 
-Staff set visibility to **published** so learners can be assigned the video.
+Video is published so it can be assigned.
 
 ![Published](instructor/published.png)
 
 ### Assign training
 
-Pick a published ready video and a learner, then assign.
+Choose a video and a learner, then assign.
 
 ![Assign form](instructor/assign-form.png)
 
 ### Assigned
 
-The assignment appears in the staff Training view.
+The new assignment shows up on the Training page.
 
 ![Assigned](instructor/assigned.png)
 
 ## Learner flow
 
-Learners see assigned videos, watch, and track progress.
+Open assigned training, watch, and update progress.
 
 ### My training
 
-Assigned list for the learner — starting state (**not started**).
+Assigned videos for the learner.
 
 ![My training](learner/my-training.png)
 
 ### Watch
 
-In-app player modal for the assigned video (no callout marks on this shot).
+In-app video player.
 
 ![Player](learner/player.png)
 
 ### In progress
 
-Progress reflected on the list (**in progress**, ~42%).
+Progress after watching part of the video.
 
 ![In progress](learner/in-progress.png)

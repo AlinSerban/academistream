@@ -4,12 +4,10 @@ B2B private training-video platform. Each customer company is a **tenant** with 
 
 ## See it in action
 
-Marked UI shots of the main demo flows:
+- [Instructor](docs/demo-screenshots/README.md#instructor-flow) — upload, publish, assign training
+- [Learner](docs/demo-screenshots/README.md#learner-flow) — watch assigned videos and track progress
 
-- [Instructor flow](docs/demo-screenshots/README.md#instructor-flow) — library → ready → publish → assign
-- [Learner flow](docs/demo-screenshots/README.md#learner-flow) — my training → watch → progress
-
-Full gallery (images + short captions): [docs/demo-screenshots](docs/demo-screenshots/README.md)
+More detail and screenshots: [docs/demo-screenshots](docs/demo-screenshots/README.md)
 
 ## Try the hosted demo
 
