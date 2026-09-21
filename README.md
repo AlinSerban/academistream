@@ -4,10 +4,10 @@ B2B private training-video platform. Each customer company is a **tenant** with 
 
 ## See it in action
 
-- [Instructor](docs/demo-screenshots/README.md#instructor-flow): upload, publish, assign training
-- [Learner](docs/demo-screenshots/README.md#learner-flow): watch assigned videos and track progress
+- **[Instructor flow](docs/demo-screenshots/README.md#instructor-flow)**: upload, publish, assign training
+- **[Learner flow](docs/demo-screenshots/README.md#learner-flow)**: watch assigned videos and track progress
 
-More detail and screenshots: [docs/demo-screenshots](docs/demo-screenshots/README.md)
+Full gallery: **[docs/demo-screenshots](docs/demo-screenshots/README.md)**
 
 ## Try the hosted demo
 
@@ -21,19 +21,23 @@ First visit after the demo has been idle can take about 1-2 minutes. You need th
 - Instructor: `instructor@acme.local`
 - Learner: `learner@acme.local`
 
-## Repo map
+## Documentation
 
-| Path | What |
-|------|------|
-| `apps/api` | NestJS HTTP API |
-| `apps/web` | React (Vite) UI |
-| `apps/worker` | Kafka consumer + media processing |
-| `packages/db` | Shared Drizzle schema / DB client |
-| `packages/shared` | Shared helpers (storage root, local mailer) |
-| `infra/terraform` | AWS resources (S3, MediaConvert, …) |
-| `infra/wake-worker` | Cloudflare Worker: wake / idle stop / proxy |
+What you will find in the technical docs, in short:
 
-## Docs
+| Topic | Covers |
+|-------|--------|
+| Goal | Multi-tenant training product: roles, library, assignments, org tools |
+| Architecture | Web, API, worker, Postgres, Kafka, Redis, storage, wake proxy |
+| Monorepo | Apps, shared packages, Terraform, wake Worker |
+| Tenancy and auth | JWT claims, memberships, roles, rate limits |
+| Product flows | Upload → process → publish → assign → watch; quotas and audit |
+| Media modes | Local disk (hosted demo) vs S3 + MediaConvert |
+| Hosted demo | Wake link, idle stop, why media stays local |
+| Local development | Docker, migrate, seed, run API / worker / web |
+| Scale path | EC2 Compose today; ECS, RDS, and managed messaging later |
+| Environments | `local` / `uat` / `prod` config notes |
 
-- Product tour (screenshots): [docs/demo-screenshots](docs/demo-screenshots/README.md)
-- Full technical story: [docs/TECHNICAL.md](docs/TECHNICAL.md)
+Screenshots and click-through: **[Product tour](docs/demo-screenshots/README.md)**
+
+Full write-up: **[Technical documentation](docs/TECHNICAL.md)**

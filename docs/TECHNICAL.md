@@ -2,6 +2,21 @@
 
 How Academistream is built, how the main flows work, how to run it, and how it is meant to scale.
 
+## Contents
+
+1. [Goal](#1-goal): product intent and scope
+2. [Architecture](#2-architecture-today): runtime pieces and how they talk
+3. [Monorepo layout](#3-monorepo-layout): apps, packages, infra paths
+4. [Tenancy and auth](#4-tenancy-and-auth): JWT, roles, isolation
+5. [Main product flows](#5-main-product-flows): content, training, org
+6. [Media modes](#6-media-modes): local disk vs AWS
+7. [Hosted demo and wake](#7-hosted-demo-and-wake): start / idle stop
+8. [Local development](#8-local-development): install and run
+9. [Scale path](#9-scale-path): what to grow next
+10. [Environments](#10-environments): config targets
+
+Related: **[Product tour (screenshots)](demo-screenshots/README.md)** · **[README](../README.md)**
+
 ---
 
 ## 1. Goal
@@ -45,6 +60,8 @@ Storage: local disk  or  S3 (+ optional CloudFront)
 ---
 
 ## 3. Monorepo layout
+
+One repo for the product and demo ops. Apps are the services you run; packages are shared libraries; `infra` holds AWS Terraform and the Cloudflare wake Worker.
 
 | Path | Package | Notes |
 |------|---------|--------|
