@@ -11,21 +11,15 @@ More detail and screenshots: [docs/demo-screenshots](docs/demo-screenshots/READM
 
 ## Try the hosted demo
 
-**URL:** https://academistream.online/?wake=true  
+Open **[academistream.online/?wake=true](https://academistream.online/?wake=true)**.
 
-Use the full wake link. The bare domain will not start a stopped VM (keeps crawlers from burning EC2 time).
+The first visit after idle can take about 1–2 minutes to start. Use that full link (with `wake=true`); the bare domain alone will not wake the demo.
 
-| | |
-|--|--|
-| Cold start | ~1–2 minutes on first wake |
-| Auto-stop | Stops after ~20 minutes with no page visits |
-| Media | Local disk on the instance (no MediaConvert) — keeps demo cost low |
+**Sign in** with password `Password123!`:
 
-**Logins** (seed only — not production). Password: `Password123!`
-
-- Admin: `admin@acme.local`
-- Instructor: `instructor@acme.local`
-- Learner: `learner@acme.local`
+- Admin — `admin@acme.local`
+- Instructor — `instructor@acme.local`
+- Learner — `learner@acme.local`
 
 ## Repo map
 
