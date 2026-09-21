@@ -2,9 +2,14 @@
 
 B2B private training-video platform. Each customer company is a **tenant** with its own users, courses, and videos. Staff upload and assign training; learners watch and report progress.
 
-## Screenshots
+## See it in action
 
-<!-- Add demo screenshots here (e.g. docs/demo-screenshots/). -->
+Marked UI shots of the main demo flows:
+
+- [Instructor flow](docs/demo-screenshots/README.md#instructor-flow) — library → ready → publish → assign
+- [Learner flow](docs/demo-screenshots/README.md#learner-flow) — my training → watch → progress
+
+Full gallery (images + short captions): [docs/demo-screenshots](docs/demo-screenshots/README.md)
 
 ## Try the hosted demo
 
@@ -38,6 +43,5 @@ Use the full wake link. The bare domain will not start a stopped VM (keeps crawl
 
 ## Docs
 
-Full technical story (architecture, how it works, local run, media modes, scale plan):
-
-→ **[docs/TECHNICAL.md](docs/TECHNICAL.md)**
+- Product tour (screenshots): [docs/demo-screenshots](docs/demo-screenshots/README.md)
+- Full technical story: [docs/TECHNICAL.md](docs/TECHNICAL.md)
