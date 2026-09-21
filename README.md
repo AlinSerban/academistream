@@ -4,8 +4,8 @@ B2B private training-video platform. Each customer company is a **tenant** with 
 
 ## See it in action
 
-- [Instructor](docs/demo-screenshots/README.md#instructor-flow) — upload, publish, assign training
-- [Learner](docs/demo-screenshots/README.md#learner-flow) — watch assigned videos and track progress
+- [Instructor](docs/demo-screenshots/README.md#instructor-flow): upload, publish, assign training
+- [Learner](docs/demo-screenshots/README.md#learner-flow): watch assigned videos and track progress
 
 More detail and screenshots: [docs/demo-screenshots](docs/demo-screenshots/README.md)
 
@@ -13,13 +13,13 @@ More detail and screenshots: [docs/demo-screenshots](docs/demo-screenshots/READM
 
 Open **[academistream.online/?wake=true](https://academistream.online/?wake=true)**.
 
-The first visit after idle can take about 1–2 minutes to start. Use that full link (with `wake=true`); the bare domain alone will not wake the demo.
+First visit after the demo has been idle can take about 1-2 minutes. You need the `?wake=true` part; opening https://academistream.online alone will not start it.
 
 **Sign in** with password `Password123!`:
 
-- Admin — `admin@acme.local`
-- Instructor — `instructor@acme.local`
-- Learner — `learner@acme.local`
+- Admin: `admin@acme.local`
+- Instructor: `instructor@acme.local`
+- Learner: `learner@acme.local`
 
 ## Repo map
 
