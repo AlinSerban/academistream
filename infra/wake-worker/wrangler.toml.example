@@ -1,19 +1,24 @@
+# Copy to wrangler.toml and fill in your own values (wrangler.toml is gitignored).
+#   cp wrangler.toml.example wrangler.toml
+#
+# Deploy only after EC2_INSTANCE_ID, ORIGIN_IP, and the KV id match YOUR account.
+
 name = "academistream-wake"
 main = "src/index.ts"
 compatibility_date = "2025-03-01"
 workers_dev = false
 
 [[routes]]
-pattern = "academistream.online/*"
-zone_name = "academistream.online"
+pattern = "your-domain.example/*"
+zone_name = "your-domain.example"
 
 [[routes]]
-pattern = "www.academistream.online/*"
-zone_name = "academistream.online"
+pattern = "www.your-domain.example/*"
+zone_name = "your-domain.example"
 
 [[kv_namespaces]]
 binding = "WAKE_KV"
-id = "2be7e35655774aa3891454dec5a7dbbc"
+id = "YOUR_KV_NAMESPACE_ID"
 
 # Idle stop: Cloudflare cron every 20 minutes (Worker scheduled handler).
 # Do not rely on GitHub Actions HTTP → /__wake/idle-tick while Bot Fight Mode is on
@@ -23,14 +28,14 @@ crons = ["*/20 * * * *"]
 
 [vars]
 AWS_REGION = "eu-central-1"
-EC2_INSTANCE_ID = "i-0c8e42174984f3d6c"
-# Elastic IP of the demo EC2 (update if you re-allocate)
-ORIGIN_IP = "3.69.93.245"
+EC2_INSTANCE_ID = "i-YOUR_INSTANCE_ID"
+# Elastic IP of the demo EC2 (must match the DNS A record)
+ORIGIN_IP = "YOUR.ELASTIC.IP.HERE"
 IDLE_STOP_MINUTES = "20"
 # Public gate: StartInstances only when URL has ?wake=<this> (same value in root README)
 WAKE_GATE = "true"
 
-# Secrets:
+# Secrets (never commit):
 #   npx wrangler secret put AWS_ACCESS_KEY_ID
 #   npx wrangler secret put AWS_SECRET_ACCESS_KEY
 #   npx wrangler secret put IDLE_TICK_SECRET   # optional manual /__wake/idle-tick

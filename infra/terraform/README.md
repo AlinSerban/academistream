@@ -13,7 +13,7 @@ App hosting stays on EC2 + Docker for the v1 demo; see `docs/TECHNICAL.md` (scal
 | `aws_iam_role.mediaconvert` | Role **MediaConvert assumes** to read/write S3 during jobs |
 | `aws_iam_role_policy.mediaconvert_s3` | S3 get/put/list on that bucket only |
 
-Bucket name pattern: `{project}-{env}-media-{account_id}` (e.g. `academistream-dev-media-068741930484`).
+Bucket name pattern: `{project}-{env}-media-{account_id}` (e.g. `academistream-dev-media-123456789012`).
 
 ## Prerequisites
 

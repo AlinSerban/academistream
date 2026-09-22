@@ -51,31 +51,37 @@ aws iam create-access-key --user-name academistream-wake
 
 Save the **Access Key ID** and **Secret** — you will put them in Cloudflare Worker secrets only (never commit).
 
-Optional: tighten the policy `Resource` to your instance ARN:
+Optional: tighten the policy `Resource` to your instance ARN (replace placeholders in `iam-policy.json`):
 
-`arn:aws:ec2:eu-central-1:ACCOUNT_ID:instance/i-0c8e42174984f3d6c`
+`arn:aws:ec2:eu-central-1:YOUR_AWS_ACCOUNT_ID:instance/i-YOUR_INSTANCE_ID`
 
 (`StartInstances` supports resource-level ARNs; `DescribeInstances` often needs `*`.)
 
-## Keep the Elastic IP
+## Private deploy config
 
-Do **not** release the Elastic IP while using wake-on-visit. The Worker’s `ORIGIN_IP` must match the address DNS points at.
+`wrangler.toml` holds your real instance id, Elastic IP, KV namespace id, and domain routes. It is **gitignored**.
 
-Current defaults in `wrangler.toml`:
+```bash
+cd infra/wake-worker
+cp wrangler.toml.example wrangler.toml
+# Edit wrangler.toml: your domain routes, KV id, EC2_INSTANCE_ID, ORIGIN_IP
+```
 
-| Var | Value |
+| Var | Set to |
 |-----|--------|
-| `EC2_INSTANCE_ID` | `i-0c8e42174984f3d6c` |
-| `AWS_REGION` | `eu-central-1` |
-| `ORIGIN_IP` | `3.69.93.245` |
-| `IDLE_STOP_MINUTES` | `20` |
+| `EC2_INSTANCE_ID` | Your demo EC2 instance id |
+| `AWS_REGION` | Region of that instance (example: `eu-central-1`) |
+| `ORIGIN_IP` | Elastic IP attached to that instance |
+| `IDLE_STOP_MINUTES` | Idle window before stop (example: `20`) |
+| KV `id` | Your `WAKE_KV` namespace id from the Cloudflare dashboard |
 
-If the IP changes: update Cloudflare DNS **and** `ORIGIN_IP` in `wrangler.toml`, then redeploy.
+If the IP changes: update Cloudflare DNS **and** `ORIGIN_IP` in your local `wrangler.toml`, then redeploy.
 
 ## Deploy the Worker
 
 ```bash
 cd infra/wake-worker
+cp wrangler.toml.example wrangler.toml   # first time only; then fill real values
 npm install
 npx wrangler login
 npx wrangler secret put AWS_ACCESS_KEY_ID
@@ -83,6 +89,10 @@ npx wrangler secret put AWS_SECRET_ACCESS_KEY
 npx wrangler secret put IDLE_TICK_SECRET
 npx wrangler deploy
 ```
+
+Deploy only with a filled `wrangler.toml`. Never deploy placeholders against a live demo.
+
+Do **not** release the Elastic IP while using wake-on-visit. `ORIGIN_IP` must match the address DNS points at.
 
 Attach the custom domain in Cloudflare:
 
@@ -101,8 +111,8 @@ npx wrangler domains add academistream.online
 
 Worker routes alone are not enough — traffic must go through Cloudflare:
 
-1. DNS → A record `@` → `3.69.93.245` → turn **Proxy on** (orange cloud)
-2. CNAME `www` → `academistream.online` → **Proxy on**
+1. DNS → A record `@` → your Elastic IP (same as `ORIGIN_IP`) → turn **Proxy on** (orange cloud)
+2. CNAME `www` → your apex domain → **Proxy on**
 3. SSL/TLS → overview → encryption mode **Full** (or **Full (strict)** while the origin cert is valid)
 
 **Grey cloud = Worker never runs** (DNS goes straight to EC2). Wake will not work until the cloud is orange.

@@ -14,9 +14,10 @@ coverage
 .turbo
 .data/
 
-# Cloudflare Wrangler local state
+# Cloudflare Wrangler local state + private deploy config (copy from wrangler.toml.example)
 infra/wake-worker/.wrangler/
 infra/wake-worker/node_modules/
+infra/wake-worker/wrangler.toml
 
 # Terraform
 infra/terraform/.terraform/

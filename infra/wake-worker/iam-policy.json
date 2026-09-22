@@ -9,7 +9,7 @@
         "ec2:StopInstances",
         "ec2:DescribeInstanceStatus"
       ],
-      "Resource": "arn:aws:ec2:eu-central-1:068741930484:instance/i-0c8e42174984f3d6c"
+      "Resource": "arn:aws:ec2:eu-central-1:YOUR_AWS_ACCOUNT_ID:instance/i-YOUR_INSTANCE_ID"
     },
     {
       "Sid": "DescribeInstances",
