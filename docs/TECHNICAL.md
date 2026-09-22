@@ -61,7 +61,7 @@ Storage: local disk  or  S3 (+ optional CloudFront)
 
 ## 3. Monorepo layout
 
-One repo for the product and demo ops. Apps are the services you run; packages are shared libraries; `infra` holds AWS Terraform and the Cloudflare wake Worker.
+One repo for the product and demo operations. Apps are the services you run; packages are shared libraries; `infra` holds AWS Terraform and the Cloudflare wake Worker.
 
 | Path | Package | Notes |
 |------|---------|--------|
@@ -115,10 +115,11 @@ UI status labels are the same in both modes (`queued` → `processing` → `read
 
 ### Org
 
-- Invites (token shown once, 7-day expiry, local/console mailer).
-- Members list/remove (cannot remove last `tenant_admin`).
-- Quotas: `maxUsers` / `maxVideos` (null = unlimited); enforced on invite accept and video create.
-- Audit events are best-effort and never block the primary write.
+- **Invites:** Admin creates an invite (email + role). The API returns a raw token **once** in the response; the UI shows it so you can copy it. Token expires in 7 days. There is no real outbound email: `LocalMailerService` only logs a would-send line to the server console. Invitee joins via `/invites/accept` with that token.
+- **Members:** Admins list members and remove people from the tenant. You cannot remove the last `tenant_admin`, so the org is never left without an admin.
+- **Quotas:** Per-tenant caps `maxUsers` and `maxVideos`. `null` means unlimited. Checked when someone accepts an invite (new member) and when a video is created. Seeded demo tenants use small limits (see seed).
+- **Audit:** Important org/content actions write an audit row. If that insert fails, the primary action still succeeds; the failure is logged only. Audit never blocks invites, uploads, or other writes.
+- **CSV export:** Admins can export training progress / completions as CSV from the Organization page.
 
 ---
 
@@ -131,9 +132,18 @@ UI status labels are the same in both modes (`queued` → `processing` → `read
 | Process | File exists → ready | MediaConvert + poller |
 | Playback | Signed HTTPS `/api/local-media` when `WEB_ORIGIN` + `JWT_SECRET` set | S3 presigned or CloudFront signed |
 
-**Switch to AWS:** Terraform apply → put outputs in `.env` → set `STORAGE_PROVIDER=s3`, `AWS_REGION`, `S3_BUCKET`, `MEDIACONVERT_ROLE` on **API and worker** → restart both. Optional `CLOUDFRONT_*`. See `infra/terraform/README.md` and `.env.aws.example`.
+**Switch to AWS (order matters):**
 
-**Switch back to local:** `STORAGE_PROVIDER=local`, keep `STORAGE_LOCAL_ROOT` + `WEB_ORIGIN`, restart. No MediaConvert charges.
+1. **Provision AWS first.** From `infra/terraform`, run `terraform apply`. That creates the S3 media bucket and the IAM role MediaConvert assumes. Until this step succeeds, the app has nothing in your AWS account to talk to.
+2. **Copy outputs into `.env`.** Use `terraform output` for `aws_region`, `s3_bucket_name`, and `mediaconvert_role_arn` (see `.env.aws.example` for the variable names). Do not commit the filled `.env`.
+3. **Point both processes at S3.** On the **API and the worker**, set `STORAGE_PROVIDER=s3`, `AWS_REGION`, `S3_BUCKET`, and `MEDIACONVERT_ROLE`. Both need the same values; only one side still on `local` will break the pipeline.
+4. **Credentials.** The processes must be able to call AWS (CLI profile, `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, or an EC2 instance role). Those secrets stay outside the repo.
+5. **Restart API and worker** so they pick up the new config. Uploads then go to S3; the worker submits MediaConvert jobs and polls until `ready` / `failed`.
+6. **Optional CloudFront.** Set `CLOUDFRONT_*` only if you built a signed-playback distribution. Otherwise playback uses S3 presigned URLs.
+
+Details: `infra/terraform/README.md` and `.env.aws.example`.
+
+**Switch back to local:** Set `STORAGE_PROVIDER=local`, keep `STORAGE_LOCAL_ROOT` + `WEB_ORIGIN`, restart API and worker. No MediaConvert charges while on local.
 
 Cost notes when on AWS: MediaConvert bills per output minute; use short clips while developing; tear down unused objects when done.
 
