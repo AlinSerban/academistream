@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import {
   ThemedVideoPlayer,
   type WatchProgressUpdate,
@@ -7,6 +7,8 @@ import {
 function isBrowserPlayableUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://')
 }
+
+const BODY_SCROLL_LOCK = 'body-scroll-lock'
 
 export function VideoPlayerModal({
   title,
@@ -33,18 +35,22 @@ export function VideoPlayerModal({
   onProgress?: (update: WatchProgressUpdate) => void
   onClose: () => void
 }) {
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && !document.fullscreenElement) onClose()
+      if (event.key === 'Escape' && !document.fullscreenElement) {
+        onCloseRef.current()
+      }
     }
     window.addEventListener('keydown', onKeyDown)
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    document.body.classList.add(BODY_SCROLL_LOCK)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = previous
+      document.body.classList.remove(BODY_SCROLL_LOCK)
     }
-  }, [onClose])
+  }, [])
 
   const playable =
     playbackUrl != null && isBrowserPlayableUrl(playbackUrl)

@@ -53,6 +53,10 @@ body {
   background: var(--bg);
 }
 
+body.body-scroll-lock {
+  overflow: hidden;
+}
+
 html {
   scrollbar-gutter: stable;
 }
@@ -622,6 +626,7 @@ html {
     margin: 0 auto;
     padding: 24px;
     gap: 24px;
+    overflow: visible;
   }
 
   .app-sidebar {
@@ -761,10 +766,12 @@ html {
     box-shadow: none;
     display: flex;
     flex-direction: column;
+    overflow: visible;
   }
 
   .app-main-body {
     padding: 0;
+    overflow: visible;
   }
 
   .page-header {

@@ -68,20 +68,6 @@ export function LearnerTraining() {
   const watchInitialPercent =
     watchRow && !watchDone ? watchRow.percent : 0
 
-  useEffect(() => {
-    if (!watchTarget) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') closeWatch()
-    }
-    window.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
-    }
-  }, [watchTarget])
-
   function closeWatch() {
     setWatchTarget(null)
     setPlaybackUrl(null)

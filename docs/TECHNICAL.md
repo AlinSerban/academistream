@@ -5,7 +5,7 @@ How Academistream is built, how the main flows work, how to run it, and how it i
 ## Contents
 
 1. [Goal](#1-goal): product intent and scope
-2. [Architecture](#2-architecture-today): runtime pieces and how they talk
+2. [Architecture](#2-architecture): runtime pieces and how they talk
 3. [Monorepo layout](#3-monorepo-layout): apps, packages, infra paths
 4. [Tenancy and auth](#4-tenancy-and-auth): JWT, roles, isolation
 5. [Main product flows](#5-main-product-flows): content, training, org
@@ -34,7 +34,7 @@ The hosted demo stays on **local disk storage** so it is cheap to leave online w
 
 ---
 
-## 2. Architecture (today)
+## 2. Architecture
 
 ```
 Browser (apps/web)
